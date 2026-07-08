@@ -440,7 +440,7 @@
   <div class="panel-card">
     <div class="track-title" id="music-title">月台低语</div>
     <div class="track-meta" id="music-meta">LO-FI · 82 BPM · 本地合成</div>
-    <div class="track-meta" id="music-status">它正在戴着耳机听歌；点击即可一起听。</div>
+    <div class="track-meta" id="music-status">它正在哼着歌；点击即可一起听。</div>
   </div>
   <div class="gap"></div>
   <div class="panel-row">
@@ -996,51 +996,53 @@ function addLifeProps() {
 }
 addLifeProps();
 
-const headphones = new THREE.Group();
-headphones.name = 'ListeningHeadphones';
-headphones.visible = false;
-function addHeadphonePart(mesh, pos, rot = [0, 0, 0], scale = [1, 1, 1]) {
-  mesh.position.set(...pos);
-  mesh.rotation.set(...rot);
-  mesh.scale.set(...scale);
-  mesh.castShadow = true;
-  headphones.add(mesh);
-  return mesh;
+/* 听歌提示：头旁漂浮的音符贴片（用户要求删掉 3D 耳机——形状难贴合且会穿模）。
+   贴片始终面向镜头且悬在头外侧固定距离，物理上不可能穿模。 */
+const musicNotes = new THREE.Group();
+musicNotes.name = 'MusicNotes';
+musicNotes.visible = false;
+scene.add(musicNotes);
+function makeNoteSprite(char, color) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  ctx.font = 'bold 92px "PingFang SC", "Hiragino Sans GB", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 10;
+  ctx.strokeStyle = 'rgba(255,255,255,.9)';
+  ctx.strokeText(char, 64, 70);
+  ctx.fillStyle = color;
+  ctx.fillText(char, 64, 70);
+  const tex = new THREE.CanvasTexture(c);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  sprite.scale.setScalar(.085);
+  return sprite;
 }
-function createHeadphones() {
-  const shell = new THREE.MeshStandardMaterial({ color: 0xfff5f0, roughness: .45, metalness: .04 });
-  const pad = new THREE.MeshStandardMaterial({ color: 0xf7a8c0, roughness: .6, metalness: .02 });
-  const glow = new THREE.MeshBasicMaterial({ color: 0xffc6d8, transparent: true, opacity: .52 });
-  const band = new THREE.Mesh(new THREE.TorusGeometry(.155, .012, 8, 38, Math.PI), shell);
-  addHeadphonePart(band, [0, .06, -.01], [0, 0, Math.PI]);
-  addHeadphonePart(new THREE.Mesh(new RoundedBoxGeometry(.052, .078, .034, 3, .012), shell), [-.15, -.022, .01], [0, 0, .08]);
-  addHeadphonePart(new THREE.Mesh(new RoundedBoxGeometry(.052, .078, .034, 3, .012), shell), [.15, -.022, .01], [0, 0, -.08]);
-  addHeadphonePart(new THREE.Mesh(new RoundedBoxGeometry(.034, .058, .016, 3, .008), pad), [-.142, -.022, .028], [0, 0, .08]);
-  addHeadphonePart(new THREE.Mesh(new RoundedBoxGeometry(.034, .058, .016, 3, .008), pad), [.142, -.022, .028], [0, 0, -.08]);
-  addHeadphonePart(new THREE.Mesh(new THREE.RingGeometry(.026, .031, 24), glow), [-.152, -.022, .032], [0, 0, .08]);
-  addHeadphonePart(new THREE.Mesh(new THREE.RingGeometry(.026, .031, 24), glow), [.152, -.022, .032], [0, 0, -.08]);
-}
-createHeadphones();
-/* Q 版大头模型：耳机按头骨包围盒手工对位（头骨半宽 .09、发型半宽 .14、耳位世界高 ~.34） */
-const HEADPHONE_FIT = { y: .118, z: -.026, sx: 1.0, sy: .82, sz: 1.0 };
-let headphoneParent = null;
-function updateHeadphones(t) {
-  const head = vrm?.humanoid?.getNormalizedBoneNode('head');
-  if (!head) return;
-  if (headphoneParent !== head) {
-    headphoneParent?.remove(headphones);
-    head.add(headphones);
-    headphoneParent = head;
-  }
-  /* 只有真的在听歌时才戴耳机，平时不常驻 */
-  headphones.visible = musicState.playing || currentKey === 'ListenMusic';
-  if (!headphones.visible) return;
-  const hs = diyState.shape.headScale || 1;
-  headphones.position.set(0, HEADPHONE_FIT.y + Math.sin(t * 1.6) * .0015, HEADPHONE_FIT.z);
-  headphones.rotation.set(0, 0, 0);
-  headphones.scale.set(HEADPHONE_FIT.sx * hs, HEADPHONE_FIT.sy * hs, HEADPHONE_FIT.sz * hs);
-  headphones.children.forEach((part, i) => {
-    if (part.material?.isMeshBasicMaterial) part.material.opacity = .38 + Math.sin(t * 2.4 + i) * .14;
+[['♪', '#f27da0'], ['♫', '#63c3ae'], ['♪', '#f2a65a']].forEach(([ch, color], i) => {
+  const sprite = makeNoteSprite(ch, color);
+  sprite.userData.phase = i * 1.05;
+  musicNotes.add(sprite);
+});
+const musicNotesAnchor = new THREE.Vector3();
+function updateMusicNotes(t) {
+  const listening = (musicState.playing || currentKey === 'ListenMusic') && currentKey !== 'Sleep';
+  musicNotes.visible = listening && !!vrm;
+  if (!musicNotes.visible) return;
+  const head = vrm.humanoid.getNormalizedBoneNode('head');
+  musicNotesAnchor.setFromMatrixPosition(head.matrixWorld);
+  musicNotes.position.copy(musicNotesAnchor);
+  musicNotes.children.forEach((sprite, i) => {
+    const cycle = ((t * .42 + sprite.userData.phase) % 1);        // 0→1 循环上升
+    const side = i % 2 ? 1 : -1;
+    sprite.position.set(
+      side * (.16 + .025 * Math.sin(t * 1.7 + i * 2)),
+      .12 + cycle * .17,
+      .05
+    );
+    sprite.material.opacity = Math.sin(Math.PI * cycle) * .95;    // 淡入淡出
+    const pop = .085 * (0.8 + .3 * Math.sin(Math.PI * cycle));
+    sprite.scale.setScalar(pop);
   });
 }
 
@@ -2793,7 +2795,7 @@ function renderMusicPanel() {
   if (meta) meta.textContent = `${track.mood} · ${track.bpm} BPM · ${track.artist}`;
   if (status) status.textContent = musicState.playing
     ? '你正在和它同步听这首歌。'
-    : '它正在戴着耳机听歌；点击即可一起听。';
+    : '它正在哼着歌；点击即可一起听。';
   if (playBtn) playBtn.textContent = musicState.playing ? '暂停' : '一起听';
 }
 function setPetListening(active) {
@@ -2851,7 +2853,7 @@ function stopMusic() {
   clearTimeout(musicState.timer);
   musicState.playing = false;
   renderMusicPanel();
-  setLifeLog('同步播放已暂停，它还戴着耳机自己听。');
+  setLifeLog('同步播放已暂停，它还在自己哼着歌。');
 }
 function nextMusicTrack() {
   musicState.index = (musicState.index + 1) % MUSIC_TRACKS.length;
@@ -3047,7 +3049,7 @@ const LIFE_ACTIONS = [
   { key: 'ReadBook', label: '地上看书', stats: { study: 6, mood: 4, energy: -2 }, log: '它抱着书坐在地垫上安静阅读。' },
   { key: 'Sleep', label: '上床睡觉', stats: { energy: 16, mood: 4, hunger: -4 }, log: '它钻到床边休息，房间安静下来。' },
   { key: 'PlayBall', label: '玩球', stats: { mood: 13, energy: -6, hunger: -3 }, log: '它追着小球在地毯上玩了一会儿。' },
-  { key: 'ListenMusic', label: '戴耳机听歌', stats: { mood: 12, energy: 2, hunger: -1 }, log: '它戴上耳机，轻轻跟着节拍点头。' },
+  { key: 'ListenMusic', label: '听歌', stats: { mood: 12, energy: 2, hunger: -1 }, log: '它轻轻跟着节拍摇摆，音符飘了起来。' },
   { key: 'BrowseWeb', label: '刷网页', stats: { mood: 8, study: 2, energy: -3 }, log: '它坐到电脑前浏览网页，看到有意思的内容会分享给你。' },
   { key: 'DrawDesk', label: '画画', stats: { mood: 9, study: 4, energy: -3 }, log: '它趴在桌前画了一张小画。' },
   { key: 'HappyDance', label: '开心跳舞', stats: { mood: 15, energy: -8, hunger: -4 }, log: '它开心地跳起了小舞。' },
@@ -3535,7 +3537,7 @@ function tick() {
   ring2.rotation.z = t * .25;
   updateReadingBook(t);
   updateLifeProps(t);
-  updateHeadphones(t);
+  updateMusicNotes(t);
 
   if (camTween) {
     camTween.t += dt / .9;
