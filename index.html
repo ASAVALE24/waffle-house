@@ -575,10 +575,8 @@ const fill = new THREE.DirectionalLight(0xffe3ef, .45);
 fill.position.set(-1.5, .8, 2);
 scene.add(fill);
 
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.ShadowMaterial({ opacity: .28 }));
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-scene.add(ground);
+/* 注意：不要再加与房间地板同高的 ShadowMaterial 平面——两个共面面片会 z-fighting，
+   表现为阴影区域一直闪烁的花纹。房间地板自身 receiveShadow 即可。 */
 
 const room = new THREE.Group();
 scene.add(room);
@@ -3533,7 +3531,7 @@ function tick() {
     vrm.update(dt);
   }
 
-  glowRing.material.opacity = .3 + Math.sin(t * 1.8) * .14;
+  glowRing.material.opacity = .3 + Math.sin(t * 1.2) * .05;
   ring2.rotation.z = t * .25;
   updateReadingBook(t);
   updateLifeProps(t);
