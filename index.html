@@ -1,0 +1,3637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小窝伙伴 · Waffle House</title>
+<style>
+  :root {
+    --accent: #f2799f;
+    --accent-soft: #f9b8cc;
+    --mint: #63c3ae;
+    --mint-soft: #bfe9de;
+    --line: rgba(214, 178, 196, .38);
+    --line-strong: rgba(226, 152, 182, .55);
+    --text: #6b6070;
+    --text-dim: rgba(128, 114, 132, .62);
+    --panel-bg: rgba(255, 252, 250, .84);
+    --card-bg: rgba(248, 238, 242, .6);
+    --shadow: 0 10px 32px rgba(196, 148, 176, .18);
+    --mono: "SF Mono", "Menlo", "Roboto Mono", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #fbf2ee;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; color: var(--text); }
+
+  /* ---------- 背景：奶油晨光 ---------- */
+  #bg {
+    position: fixed; inset: 0; z-index: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 72% 12%, rgba(255, 214, 186, .5), transparent 65%),
+      radial-gradient(ellipse 55% 45% at 22% 85%, rgba(191, 233, 222, .45), transparent 65%),
+      linear-gradient(165deg, #fdf4ef 0%, #fbeff0 50%, #f3f0fa 100%);
+  }
+  .star { position: absolute; border-radius: 50%; animation: twinkle ease-in-out infinite; }
+  @keyframes twinkle { 0%,100% { opacity: .12; transform: scale(.9); } 50% { opacity: .5; transform: scale(1.06); } }
+
+  #ui-toggle {
+    position: fixed; right: 18px; top: 18px; z-index: 20;
+    height: 32px; min-width: 58px; padding: 0 12px;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: var(--panel-bg); box-shadow: var(--shadow);
+    color: var(--accent); font-size: 11px; letter-spacing: 2px; font-weight: 600;
+    cursor: pointer; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    transition: opacity .18s ease, background .18s ease, border-color .18s ease;
+  }
+  #ui-toggle:hover { background: #fff; border-color: var(--accent-soft); }
+  #module-dock {
+    position: fixed; left: 18px; top: 18px; z-index: 22;
+    width: 60px; padding: 9px; display: grid; gap: 8px;
+    border-radius: 20px;
+  }
+  .dock-btn {
+    height: 42px; border: 1px solid transparent; border-radius: 13px;
+    background: transparent;
+    color: var(--text); font-size: 12px; letter-spacing: 1px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; user-select: none;
+    transition: background .18s ease, border-color .18s ease, color .18s ease;
+  }
+  .dock-btn:hover { background: rgba(242, 121, 159, .09); color: var(--accent); }
+  .dock-btn.active {
+    color: #fff; border-color: var(--accent-soft);
+    background: linear-gradient(135deg, #f78fb3, #f2799f);
+    box-shadow: 0 4px 12px rgba(242, 121, 159, .35);
+  }
+  .hidden-panel {
+    opacity: 0 !important; pointer-events: none !important;
+    transform: translateX(-18px) !important;
+  }
+  #action-panel.hidden-panel { transform: translateX(18px) !important; }
+  .companion-panel.hidden-panel { transform: translateX(-18px) !important; }
+  body.ui-min #game-panel {
+    animation: none; opacity: .18; pointer-events: none; transform: translateX(calc(-100% + 18px));
+  }
+  body.ui-min #action-panel {
+    animation: none; opacity: .18; pointer-events: none; transform: translateX(calc(100% - 18px));
+  }
+  body.ui-min .companion-panel {
+    opacity: .12; pointer-events: none; transform: translateX(calc(-100% + 18px));
+  }
+  body.ui-min #module-dock { opacity: .42; }
+
+  #canvas-wrap { position: fixed; inset: 0; z-index: 1; }
+  canvas { display: block; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- 面板通用 ---------- */
+  .panel {
+    background: var(--panel-bg);
+    border: 1px solid rgba(238, 208, 220, .8);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  .sec-label { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 2px; font-weight: 600; color: var(--accent); margin-bottom: 10px; }
+  .sec-label::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-soft); }
+  .sec-label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+  /* ---------- 右侧控制台 ---------- */
+  #action-panel {
+    position: fixed; right: 24px; top: 24px; bottom: 24px;
+    z-index: 10; width: 268px; padding: 16px 14px;
+    overflow-y: auto; overscroll-behavior: contain;
+    animation: fadeIn 1.2s ease both .4s;
+    transition: opacity .22s ease, transform .24s ease;
+  }
+  #action-panel::-webkit-scrollbar { width: 4px; }
+  #action-panel::-webkit-scrollbar-track { background: transparent; }
+  #action-panel::-webkit-scrollbar-thumb { background: rgba(226, 152, 182, .35); border-radius: 4px; }
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .abtn {
+    position: relative; padding: 7px 6px; font-size: 12px; letter-spacing: 1px; text-align: center;
+    color: var(--text); cursor: pointer; user-select: none;
+    border: 1px solid rgba(230, 202, 214, .7); border-radius: 11px;
+    background: rgba(255, 255, 255, .72);
+    transition: all .18s ease;
+  }
+  .abtn:hover { border-color: var(--accent-soft); background: #fff; color: var(--accent); }
+  .abtn.active {
+    border-color: transparent; color: #fff;
+    background: linear-gradient(135deg, #f78fb3, #f2799f);
+    box-shadow: 0 4px 12px rgba(242, 121, 159, .32);
+  }
+  .gap { height: 12px; }
+
+  @media (max-height: 760px) {
+    #action-panel { top: 14px; bottom: 14px; right: 16px; padding: 12px; }
+    .sec-label { margin-bottom: 8px; font-size: 9px; letter-spacing: 2px; }
+    .abtn { padding: 6px 3px 6px 8px; font-size: 11px; }
+    .btn-grid { gap: 5px; }
+    .gap { height: 9px; }
+  }
+
+  @media (max-width: 700px) {
+    #action-panel {
+      left: 12px; right: 12px; top: auto; bottom: 12px;
+      width: auto; max-height: 34vh;
+      padding: 12px;
+    }
+    .btn-grid, #expr-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .sec-label { margin-bottom: 7px; font-size: 8.5px; letter-spacing: 2px; }
+    .abtn, .ebtn { height: 30px; padding: 0 5px; font-size: 10px; letter-spacing: 1px; justify-content: center; text-align: center; }
+    .gap { height: 8px; }
+  }
+
+  #expr-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .ebtn {
+    min-width: 0; height: 30px; padding: 0 7px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; user-select: none; font-size: 11px; letter-spacing: 1px; color: var(--text);
+    border: 1px solid rgba(230, 202, 214, .7); border-radius: 10px;
+    background: rgba(255, 255, 255, .72); transition: all .18s ease;
+  }
+  .ebtn:hover { border-color: var(--accent-soft); background: #fff; color: var(--accent); }
+  .ebtn.active { border-color: var(--accent-soft); color: var(--accent); background: rgba(247, 143, 179, .12); }
+  .diy-controls { display: grid; gap: 8px; }
+  .diy-sub {
+    margin-top: 2px; font-size: 10px; letter-spacing: 2px; font-weight: 600;
+    color: var(--mint);
+  }
+  .diy-row, .diy-range {
+    min-width: 0; height: 30px; display: grid; align-items: center; gap: 8px;
+    border: 1px solid rgba(230, 202, 214, .55); border-radius: 10px; background: var(--card-bg);
+  }
+  .diy-row { grid-template-columns: 58px 1fr; padding: 0 8px; }
+  .diy-range { grid-template-columns: 58px 1fr 34px; padding: 0 7px 0 8px; }
+  .diy-row span, .diy-range span {
+    white-space: nowrap; color: var(--text); font-size: 11px; letter-spacing: 1px;
+  }
+  .diy-range em {
+    font-style: normal; text-align: right; color: var(--text-dim);
+    font-family: var(--mono); font-size: 10px;
+  }
+  .diy-row input[type="color"] {
+    width: 100%; height: 20px; border: 1px solid var(--line); border-radius: 6px; padding: 0;
+    background: transparent; cursor: pointer;
+  }
+  .diy-row input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  .diy-row input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 5px; }
+  .diy-range input[type="range"] {
+    width: 100%; min-width: 0; accent-color: var(--accent); cursor: pointer;
+  }
+  .wide-btn { width: 100%; text-align: center; padding-left: 6px; }
+
+  #game-panel {
+    position: fixed; left: 92px; top: 24px; bottom: 24px;
+    z-index: 10; width: 286px; padding: 16px 14px;
+    overflow-y: auto; overscroll-behavior: contain;
+    animation: fadeIn 1.2s ease both .25s;
+    transition: opacity .22s ease, transform .24s ease;
+  }
+  #game-panel::-webkit-scrollbar { width: 4px; }
+  #game-panel::-webkit-scrollbar-track { background: transparent; }
+  #game-panel::-webkit-scrollbar-thumb { background: rgba(226, 152, 182, .35); border-radius: 4px; }
+  .stat-list { display: grid; gap: 8px; }
+  .stat {
+    display: grid; grid-template-columns: 48px 1fr 30px; align-items: center; gap: 8px;
+    height: 30px; padding: 0 9px; border: 1px solid rgba(230, 202, 214, .55);
+    border-radius: 11px; background: var(--card-bg);
+  }
+  .stat span { font-size: 11px; letter-spacing: 1px; color: var(--text); }
+  .stat em { font-style: normal; text-align: right; color: var(--text-dim); font-family: var(--mono); font-size: 10px; }
+  .bar { height: 6px; border-radius: 4px; background: rgba(226, 152, 182, .16); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 50%; border-radius: 4px; background: linear-gradient(90deg, #f78fb3, #7cd4c0); }
+  .growth-card {
+    display: grid; gap: 7px; padding: 10px; border: 1px solid rgba(230, 202, 214, .55);
+    border-radius: 13px; background: var(--card-bg);
+  }
+  .growth-row { display: grid; grid-template-columns: 52px 1fr 42px; align-items: center; gap: 8px; min-width: 0; }
+  .growth-row span { font-size: 11px; letter-spacing: 1px; color: var(--text); }
+  .growth-row b, .growth-row em {
+    font-family: var(--mono); font-style: normal; font-size: 10px; color: var(--text-dim);
+    text-align: right; font-weight: 500;
+  }
+  .task-list { display: grid; gap: 6px; }
+  .task {
+    min-height: 30px; display: grid; grid-template-columns: 18px 1fr 44px; align-items: center; gap: 7px;
+    padding: 6px 9px; border: 1px solid rgba(230, 202, 214, .55); border-radius: 11px; background: var(--card-bg);
+    font-size: 11px; letter-spacing: 1px;
+  }
+  .task i {
+    display: block; width: 13px; height: 13px; border: 1px solid var(--line-strong); border-radius: 50%;
+    background: rgba(255, 255, 255, .6);
+  }
+  .task b { font-weight: 500; color: var(--text); }
+  .task em { font-family: var(--mono); font-style: normal; color: var(--mint); text-align: right; font-size: 9.5px; }
+  .task.done { border-color: rgba(124, 212, 192, .5); background: rgba(124, 212, 192, .1); }
+  .task.done i { background: #7cd4c0; border-color: #7cd4c0; }
+  .item-list { display: grid; gap: 6px; }
+  .item {
+    min-height: 34px; display: grid; grid-template-columns: 1fr 34px 42px 42px; align-items: center; gap: 5px;
+    padding: 6px 8px; border: 1px solid rgba(230, 202, 214, .55); border-radius: 11px; background: var(--card-bg);
+    font-size: 11px; letter-spacing: 1px;
+  }
+  .item b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; color: var(--text); }
+  .item em { font-family: var(--mono); font-style: normal; color: var(--text-dim); text-align: right; font-size: 10px; }
+  .mini-btn {
+    height: 23px; display: flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(230, 202, 214, .7); border-radius: 8px; background: rgba(255, 255, 255, .72);
+    color: var(--text); cursor: pointer; user-select: none; font-size: 10px; letter-spacing: 1px;
+  }
+  .mini-btn:hover { border-color: var(--accent-soft); background: #fff; color: var(--accent); }
+  .mini-btn.disabled { opacity: .36; pointer-events: none; }
+  .interact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .cmd-row { display: grid; grid-template-columns: 1fr 52px; gap: 6px; }
+  .companion-panel {
+    position: fixed; left: 92px; top: 24px; z-index: 11;
+    width: 330px; max-height: calc(100vh - 48px); padding: 16px 14px;
+    overflow-y: auto; overscroll-behavior: contain;
+    transition: opacity .22s ease, transform .24s ease;
+  }
+  .companion-panel::-webkit-scrollbar { width: 4px; }
+  .companion-panel::-webkit-scrollbar-track { background: transparent; }
+  .companion-panel::-webkit-scrollbar-thumb { background: rgba(226, 152, 182, .35); border-radius: 4px; }
+  .panel-card {
+    display: grid; gap: 8px; padding: 11px; border: 1px solid rgba(230, 202, 214, .55);
+    border-radius: 13px; background: var(--card-bg);
+  }
+  .track-title, .share-title {
+    color: #4e4457; font-size: 14px; font-weight: 600; line-height: 1.45; letter-spacing: 1px;
+  }
+  .track-meta, .share-meta, .ai-budget {
+    color: var(--text-dim); font-size: 10.5px; letter-spacing: 1px;
+  }
+  .panel-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .share-card {
+    display: grid; grid-template-columns: 34px 1fr; gap: 9px; align-items: center;
+    padding: 11px; border: 1px solid rgba(230, 202, 214, .55); border-radius: 13px; background: var(--card-bg);
+  }
+  .platform-icon {
+    width: 34px; height: 34px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: #fff;
+  }
+  .platform-xhs { background: linear-gradient(135deg, #ff3459, #b10f32); }
+  .platform-douyin { background: linear-gradient(135deg, #05070d, #10e2ff 52%, #ff2b70); }
+  .platform-zhihu { background: linear-gradient(135deg, #146cff, #0d255a); }
+  .bubble-log {
+    min-height: 120px; max-height: 230px; overflow-y: auto;
+    display: grid; gap: 8px; padding: 9px; border: 1px solid rgba(230, 202, 214, .55);
+    border-radius: 13px; background: rgba(255, 255, 255, .5);
+  }
+  .bubble {
+    max-width: 86%; padding: 8px 11px; border: 1px solid rgba(230, 202, 214, .6);
+    border-radius: 13px; background: #fff; font-size: 12px; line-height: 1.55;
+  }
+  .bubble.user {
+    justify-self: end; border-color: transparent; color: #fff;
+    background: linear-gradient(135deg, #f78fb3, #f2799f);
+    border-bottom-right-radius: 4px;
+  }
+  .bubble.pet { justify-self: start; border-bottom-left-radius: 4px; }
+  .call-screen {
+    height: 104px; border: 1px solid rgba(230, 202, 214, .55); border-radius: 13px; background:
+      radial-gradient(circle at 50% 22%, rgba(247, 143, 179, .16), transparent 48%),
+      rgba(255, 255, 255, .5);
+    display: grid; align-items: center; justify-items: center; color: var(--accent);
+    font-size: 11px; letter-spacing: 3px; font-weight: 600;
+  }
+  .chat-row { display: grid; grid-template-columns: 1fr 58px; gap: 6px; }
+  #chat-input {
+    min-width: 0; height: 34px; padding: 0 11px; color: var(--text);
+    border: 1px solid rgba(230, 202, 214, .7); border-radius: 11px; background: rgba(255, 255, 255, .8);
+    outline: none; font-size: 12px;
+  }
+  #chat-input:focus { border-color: var(--accent-soft); box-shadow: 0 0 0 2px rgba(247, 143, 179, .15); }
+  #pet-command {
+    min-width: 0; height: 34px; padding: 0 11px; color: var(--text);
+    border: 1px solid rgba(230, 202, 214, .7); border-radius: 11px; background: rgba(255, 255, 255, .8);
+    outline: none; font-size: 12px;
+  }
+  #pet-command:focus { border-color: var(--accent-soft); box-shadow: 0 0 0 2px rgba(247, 143, 179, .15); }
+  #life-log {
+    min-height: 58px; padding: 10px; border: 1px solid rgba(230, 202, 214, .55);
+    border-radius: 13px; background: var(--card-bg); color: var(--text);
+    font-size: 12px; line-height: 1.55;
+  }
+
+  @media (max-width: 700px) {
+    #game-panel {
+      left: 72px; right: 12px; top: 12px; bottom: auto;
+      width: auto; max-height: 28vh; padding: 12px;
+    }
+    #module-dock { left: 12px; top: 12px; width: 48px; padding: 7px; }
+    .dock-btn { height: 34px; font-size: 10px; }
+    .companion-panel {
+      left: 72px; right: 12px; top: 12px; width: auto; max-height: 42vh; padding: 12px;
+    }
+    .diy-row { grid-template-columns: 52px 1fr; }
+    .diy-range { grid-template-columns: 52px 1fr 32px; }
+    #ui-toggle { right: 14px; top: 14px; }
+    body.ui-min #game-panel {
+      opacity: .12; transform: translateY(calc(-100% + 14px));
+    }
+    body.ui-min #action-panel {
+      opacity: .12; transform: translateY(calc(100% - 14px));
+    }
+  }
+
+  /* ---------- 加载层 ---------- */
+  #loader {
+    position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 22px;
+    background: linear-gradient(165deg, #fdf4ef 0%, #fbeff0 60%, #f3f0fa 100%);
+    transition: opacity .8s ease;
+  }
+  #loader.done { opacity: 0; pointer-events: none; }
+  #loader .frame { width: 150px; height: 6px; border-radius: 4px; background: rgba(226, 152, 182, .18); position: relative; overflow: hidden; }
+  #loader .frame i { position: absolute; left: 0; top: 0; height: 100%; width: 0%; border-radius: 4px; background: linear-gradient(90deg, #f78fb3, #7cd4c0); transition: width .3s; }
+  #loader p { font-size: 13px; letter-spacing: 6px; color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="bg"></div>
+<div id="canvas-wrap"></div>
+<button id="ui-toggle" type="button" title="收起或展开界面">界面</button>
+<div id="module-dock" class="panel">
+  <button class="dock-btn" type="button" data-open-panel="care" title="养成">养成</button>
+  <button class="dock-btn" type="button" data-open-panel="style" title="动作和造型">造型</button>
+  <button class="dock-btn" type="button" data-open-panel="music" title="一起听歌">音乐</button>
+  <button class="dock-btn" type="button" data-open-panel="social" title="一起浏览">浏览</button>
+  <button class="dock-btn" type="button" data-open-panel="chat" title="聊天互动">聊天</button>
+</div>
+
+<div id="game-panel" class="panel hidden-panel" data-panel-id="care">
+  <div class="sec-label">CARE · 养成</div>
+  <div class="stat-list" id="stat-list">
+    <div class="stat" data-stat="hunger"><span>饱腹</span><div class="bar"><i></i></div><em>72</em></div>
+    <div class="stat" data-stat="energy"><span>精力</span><div class="bar"><i></i></div><em>68</em></div>
+    <div class="stat" data-stat="mood"><span>心情</span><div class="bar"><i></i></div><em>80</em></div>
+    <div class="stat" data-stat="clean"><span>整洁</span><div class="bar"><i></i></div><em>76</em></div>
+    <div class="stat" data-stat="study"><span>学习</span><div class="bar"><i></i></div><em>38</em></div>
+  </div>
+  <div class="gap"></div>
+  <div class="growth-card">
+    <div class="growth-row"><span>等级</span><div class="bar"><i id="xp-bar"></i></div><b id="pet-level">Lv.1</b></div>
+    <div class="growth-row"><span>亲密</span><div class="bar"><i id="affection-bar"></i></div><em id="pet-affection">8</em></div>
+    <div class="growth-row"><span>金币</span><div class="bar"><i id="coin-bar"></i></div><em id="pet-coins">0</em></div>
+  </div>
+  <div class="gap"></div>
+  <div class="sec-label">DAILY · 任务</div>
+  <div class="task-list" id="daily-tasks"></div>
+  <div class="gap"></div>
+  <div class="sec-label">BAG · 背包</div>
+  <div class="item-list" id="inventory-list"></div>
+  <div class="gap"></div>
+  <div class="sec-label">LIFE · 日常</div>
+  <div class="interact-grid" id="life-actions"></div>
+  <div class="gap"></div>
+  <div class="sec-label">COMMAND · 指令</div>
+  <div class="cmd-row">
+    <input id="pet-command" placeholder="例如：去睡觉吧 / 做饭 / 看书">
+    <div class="abtn wide-btn" id="cmd-run">执行</div>
+  </div>
+  <div class="gap"></div>
+  <div id="life-log">房间已准备好，可以安排日常互动。</div>
+</div>
+
+<div id="action-panel" class="panel hidden-panel" data-panel-id="style">
+  <div class="sec-label">CAMERA · 镜头</div>
+  <div class="btn-grid">
+    <div class="abtn" id="cam-face">特写</div>
+    <div class="abtn" id="cam-full">全身</div>
+  </div>
+  <div class="gap"></div>
+  <div class="sec-label">MOTION · 动作</div>
+  <div class="btn-grid" id="anim-btns"></div>
+  <div class="gap"></div>
+  <div class="sec-label">EXPRESSION · 表情</div>
+  <div id="expr-row"></div>
+  <div class="gap"></div>
+  <div class="sec-label">COLOR · 配色</div>
+  <div class="btn-grid" id="outfit-btns">
+    <div class="abtn outfit active" data-tint="original">原色</div>
+    <div class="abtn outfit" data-tint="cloth-blue">浅蓝衣服</div>
+    <div class="abtn outfit" data-tint="0.06,0.06,0.08">曜黑</div>
+    <div class="abtn outfit" data-tint="1.0,0.45,0.52">绯红</div>
+  </div>
+  <div class="gap"></div>
+  <div class="sec-label">DIY · 调整</div>
+  <div class="diy-controls">
+    <div class="diy-sub">COLOR</div>
+    <label class="diy-row"><span>头发</span><input type="color" data-color-part="hair" value="#ffffff"></label>
+    <label class="diy-row"><span>衣服</span><input type="color" data-color-part="tops" value="#eaf8fb"></label>
+    <label class="diy-row"><span>裤子</span><input type="color" data-color-part="pants" value="#777986"></label>
+    <label class="diy-row"><span>耳尾</span><input type="color" data-color-part="extras" value="#f8fbff"></label>
+    <label class="diy-row"><span>皮肤</span><input type="color" data-color-part="skin" value="#ffe9df"></label>
+    <label class="diy-row"><span>眼睛</span><input type="color" data-color-part="eyes" value="#89c8e9"></label>
+    <div class="diy-sub">SHAPE</div>
+    <label class="diy-range"><span>整体</span><input type="range" data-shape-part="avatarScale" min="0.75" max="1.35" step="0.01" value="1"><em>100</em></label>
+    <label class="diy-range"><span>头部</span><input type="range" data-shape-part="headScale" min="0.72" max="1.35" step="0.01" value="1"><em>100</em></label>
+    <label class="diy-range"><span>身体</span><input type="range" data-shape-part="bodyScale" min="0.78" max="1.24" step="0.01" value="1"><em>100</em></label>
+    <label class="diy-range"><span>宽度</span><input type="range" data-shape-part="bodyWidth" min="0.78" max="1.28" step="0.01" value="1"><em>100</em></label>
+    <label class="diy-range"><span>眼睛</span><input type="range" data-shape-part="eyeScale" min="0.8" max="1.22" step="0.01" value="1"><em>100</em></label>
+    <div class="abtn wide-btn" id="diy-reset">恢复默认</div>
+  </div>
+</div>
+
+<div id="music-panel" class="panel companion-panel hidden-panel" data-panel-id="music">
+  <div class="sec-label">MUSIC · 一起听</div>
+  <div class="panel-card">
+    <div class="track-title" id="music-title">月台低语</div>
+    <div class="track-meta" id="music-meta">LO-FI · 82 BPM · 本地合成</div>
+    <div class="track-meta" id="music-status">它正在戴着耳机听歌；点击即可一起听。</div>
+  </div>
+  <div class="gap"></div>
+  <div class="panel-row">
+    <div class="abtn wide-btn" id="music-play">一起听</div>
+    <div class="abtn wide-btn" id="music-next">换一首</div>
+  </div>
+  <div class="gap"></div>
+  <div class="abtn wide-btn" id="music-action">让它听歌</div>
+</div>
+
+<div id="social-panel" class="panel companion-panel hidden-panel" data-panel-id="social">
+  <div class="sec-label">BROWSE · 一起看</div>
+  <div class="share-card">
+    <div class="platform-icon platform-xhs" id="share-icon">小</div>
+    <div>
+      <div class="share-title" id="share-title">它刷到了一篇有意思的生活帖子。</div>
+      <div class="share-meta" id="share-meta">小红书 · 推荐</div>
+    </div>
+  </div>
+  <div class="gap"></div>
+  <div class="panel-row">
+    <div class="abtn wide-btn" id="share-open">一起看</div>
+    <div class="abtn wide-btn" id="share-refresh">让它推荐</div>
+  </div>
+  <div class="gap"></div>
+  <div class="btn-grid" id="platform-choices">
+    <div class="abtn active" data-platform="xhs">小红书</div>
+    <div class="abtn" data-platform="douyin">抖音</div>
+    <div class="abtn" data-platform="zhihu">知乎</div>
+  </div>
+  <div class="gap"></div>
+  <div class="ai-budget" id="ai-budget">AI 未连接时会使用本地推荐。</div>
+</div>
+
+<div id="chat-panel" class="panel companion-panel hidden-panel" data-panel-id="chat">
+  <div class="sec-label">CALL · 互动</div>
+  <div class="call-screen" id="call-screen">视频小窗 · 待连线</div>
+  <div class="gap"></div>
+  <div class="bubble-log" id="chat-log">
+    <div class="bubble pet">我在这里。可以发消息给我，也可以点“视频互动”看着我聊。</div>
+  </div>
+  <div class="gap"></div>
+  <div class="chat-row">
+    <input id="chat-input" placeholder="发消息给它">
+    <div class="abtn wide-btn" id="chat-send">发送</div>
+  </div>
+  <div class="gap"></div>
+  <div class="abtn wide-btn" id="video-call">视频互动</div>
+</div>
+
+<div id="loader">
+  <p>小窝准备中</p>
+  <div class="frame"><i id="load-bar"></i></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./node_modules/three/build/three.module.js",
+    "three/addons/": "./node_modules/three/examples/jsm/",
+    "@pixiv/three-vrm": "./node_modules/@pixiv/three-vrm/lib/three-vrm.module.min.js",
+    "@pixiv/three-vrm-animation": "./node_modules/@pixiv/three-vrm-animation/lib/three-vrm-animation.module.min.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
+
+/* ================= 背景光斑（柔和马卡龙泡泡） ================= */
+const bg = document.getElementById('bg');
+const BOKEH_COLORS = ['#ffd6e2', '#ffe8d1', '#cdeee4', '#e3ddf7'];
+for (let i = 0; i < 42; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  const size = Math.random() * 26 + 8;
+  const color = BOKEH_COLORS[i % BOKEH_COLORS.length];
+  s.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*100}%;top:${Math.random()*100}%;background:${color};filter:blur(${size > 20 ? 3 : 1.5}px);animation-duration:${4+Math.random()*5}s;animation-delay:${Math.random()*5}s;`;
+  bg.appendChild(s);
+}
+
+/* ================= 场景 ================= */
+const wrap = document.getElementById('canvas-wrap');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.02;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+wrap.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+/* 环境光照：给 Standard 材质柔和的全方位反射，房间不再是死平的灰 */
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture;
+if ('environmentIntensity' in scene) scene.environmentIntensity = .32;
+const camera = new THREE.PerspectiveCamera(28, innerWidth / innerHeight, .1, 60);
+camera.position.set(0, .75, 2.4);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, .55, 0);
+controls.enableDamping = true;
+controls.dampingFactor = .08;
+controls.minDistance = .8;
+controls.maxDistance = 8;
+controls.maxPolarAngle = Math.PI * .55;
+
+const key = new THREE.DirectionalLight(0xfff1de, 1.55);
+key.position.set(1.6, 3.4, 2.2);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.top = 2.6; key.shadow.camera.bottom = -.4;
+key.shadow.camera.left = -2.6; key.shadow.camera.right = 2.6;
+key.shadow.bias = -0.0002;
+key.shadow.normalBias = .03;
+key.shadow.radius = 8;
+scene.add(key);
+scene.add(new THREE.HemisphereLight(0xfff4ec, 0xe4d7e6, .62));
+scene.add(new THREE.AmbientLight(0xfff0e6, .34));
+const rim = new THREE.DirectionalLight(0xaed4ff, .75);
+rim.position.set(-2, 2, -3);
+scene.add(rim);
+const fill = new THREE.DirectionalLight(0xffe3ef, .45);
+fill.position.set(-1.5, .8, 2);
+scene.add(fill);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.ShadowMaterial({ opacity: .28 }));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const room = new THREE.Group();
+scene.add(room);
+let walkSurface = null;
+const roomMats = {
+  floor: new THREE.MeshStandardMaterial({ color: 0xe9f7f5, roughness: .92, metalness: .01 }),
+  wall: new THREE.MeshStandardMaterial({ color: 0xffeff5, roughness: .88, metalness: .01 }),
+  edge: new THREE.MeshStandardMaterial({ color: 0x9adcf0, roughness: .55, metalness: .08 }),
+  wood: new THREE.MeshStandardMaterial({ color: 0xb9a7d9, roughness: .76, metalness: .02 }),
+  woodDark: new THREE.MeshStandardMaterial({ color: 0x8f84bd, roughness: .8, metalness: .02 }),
+  cushion: new THREE.MeshStandardMaterial({ color: 0xaee4ee, roughness: .86, metalness: .01 }),
+  bed: new THREE.MeshStandardMaterial({ color: 0xfffbf0, roughness: .86, metalness: 0 }),
+  blanket: new THREE.MeshStandardMaterial({ color: 0xb8e4f6, roughness: .82, metalness: .01 }),
+  pillow: new THREE.MeshStandardMaterial({ color: 0xfff4c7, roughness: .84, metalness: 0 }),
+  rug: new THREE.MeshStandardMaterial({ color: 0xd8f2ff, roughness: .88, metalness: .01 }),
+  rugTrim: new THREE.MeshStandardMaterial({ color: 0xffb7cc, roughness: .74, metalness: .02 }),
+  leaf: new THREE.MeshStandardMaterial({ color: 0xa8dfbd, roughness: .84, metalness: .01 }),
+  pot: new THREE.MeshStandardMaterial({ color: 0xffc2d1, roughness: .8, metalness: .02 }),
+  warmLight: new THREE.MeshBasicMaterial({ color: 0xffe7a3, transparent: true, opacity: .72 }),
+  steel: new THREE.MeshStandardMaterial({ color: 0xb5c7d9, roughness: .5, metalness: .18 }),
+  stove: new THREE.MeshStandardMaterial({ color: 0x7d8aa6, roughness: .58, metalness: .08 }),
+  food: new THREE.MeshStandardMaterial({ color: 0xffc58f, roughness: .72, metalness: 0 }),
+  toy: new THREE.MeshStandardMaterial({ color: 0xff9bb8, roughness: .68, metalness: .02 }),
+  paper: new THREE.MeshStandardMaterial({ color: 0xfffbf0, roughness: .9, metalness: 0 }),
+  ceramic: new THREE.MeshStandardMaterial({ color: 0xf6fbff, roughness: .76, metalness: .01 }),
+  drawer: new THREE.MeshStandardMaterial({ color: 0xc7b6e5, roughness: .78, metalness: .02 }),
+  screen: new THREE.MeshBasicMaterial({ color: 0xb5ecff, transparent: true, opacity: .38 }),
+  blanketTop: new THREE.MeshStandardMaterial({ color: 0xc7edfb, roughness: .88, metalness: .01 }),
+  mirror: new THREE.MeshBasicMaterial({ color: 0xd7f5ff, transparent: true, opacity: .24 }),
+  fabricPink: new THREE.MeshStandardMaterial({ color: 0xffb7cc, roughness: .82, metalness: .01 }),
+  fabricDark: new THREE.MeshStandardMaterial({ color: 0x9aa0bc, roughness: .84, metalness: .02 }),
+  mediaGlow: new THREE.MeshBasicMaterial({ color: 0xb5ecff, transparent: true, opacity: .34 }),
+  speaker: new THREE.MeshStandardMaterial({ color: 0x9aa0bc, roughness: .7, metalness: .03 }),
+};
+const bookMats = {
+  cover: new THREE.MeshStandardMaterial({ color: 0xaecdf6, roughness: .74, metalness: .02 }),
+  coverEdge: new THREE.MeshStandardMaterial({ color: 0xffb7cc, roughness: .52, metalness: .04, emissive: 0xff8fb2, emissiveIntensity: .08 }),
+  page: new THREE.MeshStandardMaterial({ color: 0xf2f6ef, roughness: .9, metalness: 0 }),
+  pageLine: new THREE.MeshBasicMaterial({ color: 0x607286, transparent: true, opacity: .45 }),
+};
+function box(name, size, pos, mat, parent = room, radius = .025) {
+  const mesh = new THREE.Mesh(new RoundedBoxGeometry(size[0], size[1], size[2], 3, radius), mat);
+  mesh.name = name;
+  mesh.position.set(...pos);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+function cyl(name, radius, depth, pos, mat, parent = room) {
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, depth, 18), mat);
+  mesh.name = name;
+  mesh.position.set(...pos);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+function sphere(name, radius, pos, mat, parent = room, scale = [1, 1, 1]) {
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 24, 16), mat);
+  mesh.name = name;
+  mesh.position.set(...pos);
+  mesh.scale.set(...scale);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+function addRoom() {
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 3.2), roomMats.floor);
+  floor.name = 'RoomFloor';
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(0, 0, -.18);
+  floor.receiveShadow = true;
+  room.add(floor);
+  walkSurface = floor;
+
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.9), roomMats.wall);
+  wall.name = 'RoomBackWall';
+  wall.position.set(0, .95, -1.42);
+  wall.receiveShadow = true;
+  room.add(wall);
+  box('WallBaseLine', [4.6, .025, .035], [0, .02, -1.405], roomMats.edge, room, .01);
+  box('WallTopLine', [4.6, .018, .035], [0, 1.78, -1.405], roomMats.edge, room, .01);
+  box('WindowFrame', [.76, .46, .03], [1.16, 1.18, -1.39], roomMats.edge, room, .035);
+  box('WindowGlow', [.64, .34, .018], [1.16, 1.18, -1.375], new THREE.MeshBasicMaterial({ color: 0x74d9ff, transparent: true, opacity: .2 }), room, .04);
+  box('RoomRug', [1.15, .018, .72], [0, .012, .32], roomMats.rug, room, .11);
+  box('RoomRugTrimA', [1.04, .008, .018], [0, .025, -.02], roomMats.rugTrim, room, .006);
+  box('RoomRugTrimB', [1.04, .008, .018], [0, .025, .66], roomMats.rugTrim, room, .006);
+  box('RoomRugTrimC', [.018, .008, .62], [-.52, .025, .32], roomMats.rugTrim, room, .006);
+  box('RoomRugTrimD', [.018, .008, .62], [.52, .025, .32], roomMats.rugTrim, room, .006);
+
+  const chair = new THREE.Group();
+  chair.name = 'Chair';
+  chair.position.set(-1.05, 0, -.08);
+  room.add(chair);
+  box('ChairSeat', [.48, .065, .34], [0, .215, .04], roomMats.cushion, chair, .05);
+  box('ChairBack', [.52, .24, .07], [0, .36, -.18], roomMats.wood, chair, .045);
+  for (const x of [-.2, .2]) for (const z of [-.11, .16]) cyl('ChairLeg', .024, .22, [x, .11, z], roomMats.woodDark, chair);
+  box('ChairSeatTrim', [.42, .018, .018], [0, .255, .205], roomMats.rugTrim, chair, .006);
+
+  const desk = new THREE.Group();
+  desk.name = 'Desk';
+  desk.position.set(-1.05, 0, -.58);
+  room.add(desk);
+  box('DeskTop', [.82, .07, .42], [0, .48, 0], roomMats.wood, desk, .045);
+  box('DeskGlowLine', [.74, .018, .025], [0, .525, .21], roomMats.edge, desk, .012);
+  box('DeskDrawerL', [.28, .14, .035], [-.18, .36, .225], roomMats.drawer, desk, .012);
+  box('DeskDrawerR', [.28, .14, .035], [.18, .36, .225], roomMats.drawer, desk, .012);
+  box('DeskKnobL', [.025, .025, .012], [-.18, .36, .25], roomMats.rugTrim, desk, .005);
+  box('DeskKnobR', [.025, .025, .012], [.18, .36, .25], roomMats.rugTrim, desk, .005);
+  cyl('DeskLampBase', .055, .018, [-.3, .532, -.1], roomMats.steel, desk);
+  box('DeskLampPole', [.018, .23, .018], [-.3, .65, -.1], roomMats.edge, desk, .006);
+  sphere('DeskLampHead', .055, [-.24, .76, -.03], roomMats.warmLight, desk, [1.25, .55, .85]);
+  box('DeskTablet', [.2, .014, .12], [.24, .538, .08], roomMats.screen, desk, .012);
+  cyl('DeskMug', .032, .045, [-.34, .56, .13], roomMats.ceramic, desk);
+  for (const x of [-.34, .34]) for (const z of [-.15, .15]) cyl('DeskLeg', .024, .46, [x, .23, z], roomMats.woodDark, desk);
+
+  const bed = new THREE.Group();
+  bed.name = 'Bed';
+  bed.position.set(1.05, 0, -.34);
+  room.add(bed);
+  box('BedFrame', [1.38, .14, .76], [0, .11, 0], roomMats.wood, bed, .075);
+  box('BedBaseShadow', [1.24, .035, .62], [.02, .205, 0], roomMats.woodDark, bed, .035);
+  box('Mattress', [1.26, .15, .64], [0, .295, 0], roomMats.bed, bed, .09);
+  box('FittedSheetEdgeA', [1.18, .018, .024], [.02, .382, -.29], roomMats.rugTrim, bed, .008);
+  box('FittedSheetEdgeB', [1.18, .018, .024], [.02, .382, .29], roomMats.rugTrim, bed, .008);
+  box('Blanket', [.72, .052, .58], [.24, .405, .01], roomMats.blanket, bed, .085);
+  box('BlanketDropFront', [.68, .115, .032], [.24, .345, .32], roomMats.blanket, bed, .025);
+  box('BlanketDropBack', [.68, .095, .032], [.24, .352, -.3], roomMats.blanket, bed, .025);
+  box('BlanketFoldA', [.54, .014, .022], [.25, .435, -.22], roomMats.rugTrim, bed, .006);
+  box('BlanketFoldB', [.54, .014, .022], [.25, .438, .22], roomMats.rugTrim, bed, .006);
+  box('Pillow', [.42, .078, .42], [-.45, .405, 0], roomMats.pillow, bed, .09);
+  box('PillowSeam', [.3, .006, .018], [-.45, .448, 0], roomMats.rugTrim, bed, .004);
+  box('BedHead', [.09, .54, .78], [-.7, .34, 0], roomMats.wood, bed, .06);
+  box('BedHeadPad', [.04, .38, .56], [-.645, .39, 0], roomMats.cushion, bed, .045);
+  for (const x of [-.52, .52]) for (const z of [-.28, .28]) cyl('BedLeg', .026, .18, [x, .055, z], roomMats.woodDark, bed);
+
+  const shelf = new THREE.Group();
+  shelf.name = 'Bookshelf';
+  shelf.position.set(-1.78, 0, .48);
+  room.add(shelf);
+  box('ShelfFrame', [.58, .86, .16], [0, .44, 0], roomMats.wood, shelf, .035);
+  for (const y of [.24, .44, .64]) box('ShelfBoard', [.52, .025, .18], [0, y, .01], roomMats.woodDark, shelf, .01);
+  for (let i = 0; i < 13; i++) {
+    const x = -.21 + (i % 5) * .105;
+    const y = .3 + Math.floor(i / 5) * .2;
+    const color = [0x7ca7bd, 0x8ab7d6, 0xd7b58a, 0xb98ca7][i % 4];
+    box('BookSpineDecor', [.035, .14, .045], [x, y, .095], new THREE.MeshStandardMaterial({ color, roughness: .72, metalness: .02 }), shelf, .006);
+  }
+
+  const kitchen = new THREE.Group();
+  kitchen.name = 'Kitchenette';
+  kitchen.position.set(1.72, 0, .42);
+  room.add(kitchen);
+  box('KitchenCounter', [.72, .36, .42], [0, .18, 0], roomMats.wood, kitchen, .045);
+  box('CounterTop', [.78, .045, .46], [0, .38, 0], roomMats.steel, kitchen, .025);
+  for (let i = 0; i < 6; i++) {
+    box('KitchenTile', [.11, .01, .075], [-.3 + i * .12, .62, -.23], i % 2 ? roomMats.wall : roomMats.rug, kitchen, .004);
+  }
+  box('StovePlateL', [.16, .01, .16], [-.18, .41, .02], roomMats.stove, kitchen, .04);
+  box('StovePlateR', [.16, .01, .16], [.08, .41, .02], roomMats.stove, kitchen, .04);
+  box('Sink', [.18, .018, .14], [.28, .42, .02], roomMats.edge, kitchen, .025);
+  box('FaucetStem', [.018, .12, .018], [.29, .49, -.035], roomMats.steel, kitchen, .006);
+  box('FaucetSpout', [.11, .018, .018], [.235, .55, -.035], roomMats.steel, kitchen, .006);
+  box('KitchenDrawerA', [.28, .11, .025], [-.18, .26, .22], roomMats.drawer, kitchen, .008);
+  box('KitchenDrawerB', [.28, .11, .025], [.18, .26, .22], roomMats.drawer, kitchen, .008);
+  cyl('Pot', .09, .08, [-.18, .48, .02], roomMats.steel, kitchen);
+  box('Fridge', [.38, .84, .34], [.68, .42, -.03], roomMats.bed, kitchen, .045);
+  box('FridgeHandle', [.018, .34, .018], [.86, .47, .15], roomMats.edge, kitchen, .006);
+
+  const plant = new THREE.Group();
+  plant.name = 'PlantCorner';
+  plant.position.set(1.72, 0, -.98);
+  room.add(plant);
+  cyl('PlantPot', .11, .16, [0, .08, 0], roomMats.pot, plant);
+  for (let i = 0; i < 7; i++) {
+    const a = i / 7 * Math.PI * 2;
+    sphere('PlantLeaf', .065, [Math.cos(a) * .09, .23 + (i % 2) * .025, Math.sin(a) * .055], roomMats.leaf, plant, [1.35, .45, .75]);
+  }
+
+  const lamp = new THREE.Group();
+  lamp.name = 'FloorLamp';
+  lamp.position.set(-.28, 0, -.98);
+  room.add(lamp);
+  cyl('LampPole', .014, .84, [0, .42, 0], roomMats.edge, lamp);
+  cyl('LampBase', .12, .018, [0, .012, 0], roomMats.woodDark, lamp);
+  sphere('LampShade', .13, [0, .88, 0], roomMats.warmLight, lamp, [1, .58, 1]);
+  const point = new THREE.PointLight(0xffdd9a, .55, 1.4);
+  point.position.set(0, .86, 0);
+  lamp.add(point);
+
+  const media = new THREE.Group();
+  media.name = 'MediaCorner';
+  media.position.set(.16, 0, -1.28);
+  room.add(media);
+  box('MediaScreenFrame', [.82, .48, .035], [0, 1.05, 0], roomMats.woodDark, media, .035);
+  box('MediaScreenGlow', [.72, .38, .018], [0, 1.05, .025], roomMats.mediaGlow, media, .03);
+  box('MediaConsoleTop', [.9, .055, .24], [0, .38, .06], roomMats.wood, media, .035);
+  box('MediaConsoleBody', [.76, .28, .2], [0, .2, .06], roomMats.drawer, media, .03);
+  box('MediaConsoleLight', [.34, .012, .016], [.14, .31, .17], roomMats.rugTrim, media, .006);
+  box('GameDock', [.18, .1, .07], [-.24, .45, .1], roomMats.steel, media, .018);
+  box('MediaSpeakerL', [.1, .3, .09], [-.58, .55, .05], roomMats.speaker, media, .025);
+  box('MediaSpeakerR', [.1, .3, .09], [.58, .55, .05], roomMats.speaker, media, .025);
+  sphere('SpeakerDotL', .024, [-.58, .61, .105], roomMats.rugTrim, media, [1, 1, .35]);
+  sphere('SpeakerDotR', .024, [.58, .61, .105], roomMats.rugTrim, media, [1, 1, .35]);
+
+  const wardrobe = new THREE.Group();
+  wardrobe.name = 'Wardrobe';
+  wardrobe.position.set(-1.86, 0, -.15);
+  room.add(wardrobe);
+  box('WardrobeCase', [.5, .92, .22], [0, .46, 0], roomMats.wood, wardrobe, .04);
+  box('WardrobeDoorL', [.22, .82, .025], [-.12, .48, .125], roomMats.drawer, wardrobe, .016);
+  box('WardrobeDoorR', [.22, .82, .025], [.12, .48, .125], roomMats.drawer, wardrobe, .016);
+  box('WardrobeMirror', [.16, .54, .014], [.12, .55, .145], roomMats.mirror, wardrobe, .018);
+  box('WardrobeHandleL', [.014, .2, .012], [-.035, .48, .155], roomMats.rugTrim, wardrobe, .004);
+  box('WardrobeHandleR', [.014, .2, .012], [.035, .48, .155], roomMats.rugTrim, wardrobe, .004);
+  box('WardrobeTopLight', [.42, .014, .018], [0, .92, .14], roomMats.warmLight, wardrobe, .006);
+  for (let i = 0; i < 3; i++) {
+    const x = -.16 + i * .16;
+    box('WardrobeFoldedCloth', [.12, .035, .075], [x, .23 + i * .045, .15], i % 2 ? roomMats.fabricPink : roomMats.cushion, wardrobe, .012);
+  }
+
+  const petZone = new THREE.Group();
+  petZone.name = 'PetCareZone';
+  petZone.position.set(-.72, 0, .83);
+  room.add(petZone);
+  box('FloorCushion', [.48, .045, .36], [0, .032, 0], roomMats.cushion, petZone, .09);
+  cyl('FoodBowl', .095, .035, [-.34, .03, .05], roomMats.steel, petZone);
+  sphere('FoodPile', .055, [-.34, .07, .05], roomMats.food, petZone, [1, .38, 1]);
+  sphere('ToyBall', .065, [.34, .07, .05], roomMats.toy, petZone, [1, 1, 1]);
+
+  const carePlant = new THREE.Group();
+  carePlant.name = 'CarePlant';
+  carePlant.position.set(.92, 0, .74);
+  room.add(carePlant);
+  cyl('CarePlantPot', .085, .12, [0, .06, 0], roomMats.pot, carePlant);
+  for (let i = 0; i < 5; i++) {
+    const a = i / 5 * Math.PI * 2;
+    sphere('CarePlantLeaf', .052, [Math.cos(a) * .06, .16 + (i % 2) * .025, Math.sin(a) * .045], roomMats.leaf, carePlant, [1.35, .45, .75]);
+  }
+
+  const lowTable = new THREE.Group();
+  lowTable.name = 'LowDiningTable';
+  lowTable.position.set(-.43, 0, .62);
+  room.add(lowTable);
+  box('LowTableTop', [.46, .045, .3], [0, .12, 0], roomMats.wood, lowTable, .045);
+  for (const x of [-.18, .18]) for (const z of [-.1, .1]) cyl('LowTableLeg', .016, .12, [x, .06, z], roomMats.woodDark, lowTable);
+  box('DiningCushion', [.44, .045, .28], [0, .032, .36], roomMats.cushion, lowTable, .08);
+}
+addRoom();
+
+const readingBook = new THREE.Group();
+readingBook.name = 'ReadingBook';
+readingBook.visible = false;
+scene.add(readingBook);
+function addBookPart(name, size, pos, rot, mat, radius = .006) {
+  const mesh = new THREE.Mesh(new RoundedBoxGeometry(size[0], size[1], size[2], 2, radius), mat);
+  mesh.name = name;
+  mesh.position.set(...pos);
+  mesh.rotation.set(...rot);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  readingBook.add(mesh);
+  return mesh;
+}
+function addReadingBook() {
+  addBookPart('BookCoverLeft', [.215, .014, .29], [-.108, 0, 0], [0, 0, -.035], bookMats.cover, .01);
+  addBookPart('BookCoverRight', [.215, .014, .29], [.108, 0, 0], [0, 0, .035], bookMats.cover, .01);
+  addBookPart('BookLeftPage', [.19, .012, .255], [-.095, .012, 0], [0, 0, -.028], bookMats.page, .008);
+  addBookPart('BookRightPage', [.19, .012, .255], [.095, .012, 0], [0, 0, .028], bookMats.page, .008);
+  addBookPart('BookCenterLine', [.012, .012, .255], [0, .018, 0], [0, 0, 0], bookMats.coverEdge, .002);
+  for (let i = 0; i < 4; i++) {
+    addBookPart('LeftPageLine', [.105, .003, .004], [-.095, .023, -.075 + i * .04], [0, 0, -.028], bookMats.pageLine, .002);
+    addBookPart('RightPageLine', [.105, .003, .004], [.095, .023, -.075 + i * .04], [0, 0, .028], bookMats.pageLine, .002);
+  }
+  readingBook.position.set(0, .16, .3);
+  readingBook.rotation.set(.72, 0, 0);
+  readingBook.scale.setScalar(.27);
+}
+addReadingBook();
+
+const lifeProps = new THREE.Group();
+lifeProps.name = 'LifeProps';
+scene.add(lifeProps);
+const propGroups = {};
+function makePropGroup(name) {
+  const g = new THREE.Group();
+  g.name = name;
+  g.visible = false;
+  lifeProps.add(g);
+  propGroups[name] = g;
+  return g;
+}
+function propBox(parent, name, size, pos, rot, mat, radius = .006) {
+  const mesh = new THREE.Mesh(new RoundedBoxGeometry(size[0], size[1], size[2], 2, radius), mat);
+  mesh.name = name;
+  mesh.position.set(...pos);
+  mesh.rotation.set(...rot);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+function propCyl(parent, name, radius, depth, pos, rot, mat) {
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, depth, 24), mat);
+  mesh.name = name;
+  mesh.position.set(...pos);
+  mesh.rotation.set(...rot);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+function addLifeProps() {
+  const study = makePropGroup('DeskStudyProp');
+  propBox(study, 'DeskBookCover', [.39, .014, .24], [-1.05, .545, -.39], [-.08, 0, 0], bookMats.cover, .012);
+  propBox(study, 'DeskOpenBook', [.34, .018, .21], [-1.05, .565, -.39], [-.08, 0, 0], bookMats.page, .01);
+  propBox(study, 'DeskBookCenter', [.006, .004, .18], [-1.05, .58, -.39], [-.08, 0, 0], bookMats.coverEdge, .002);
+  for (let i = 0; i < 3; i++) {
+    propBox(study, 'DeskBookLineL', [.1, .003, .004], [-1.14, .585, -.45 + i * .045], [-.08, 0, 0], bookMats.pageLine, .002);
+    propBox(study, 'DeskBookLineR', [.1, .003, .004], [-.96, .585, -.45 + i * .045], [-.08, 0, 0], bookMats.pageLine, .002);
+  }
+  propBox(study, 'DeskPencil', [.16, .012, .012], [-.82, .575, -.3], [0, .5, 0], roomMats.edge, .005);
+
+  const cook = makePropGroup('CookProp');
+  propCyl(cook, 'Pan', .12, .05, [1.54, .53, .44], [0, 0, 0], roomMats.steel);
+  propBox(cook, 'Spatula', [.22, .014, .018], [1.36, .6, .54], [0, 0, .45], roomMats.woodDark, .004);
+  sphere('SoupGlow', .07, [1.54, .545, .44], roomMats.food, cook, [1, .18, 1]);
+  sphere('SteamA', .035, [1.51, .66, .42], roomMats.warmLight, cook, [.7, 1.2, .7]);
+  sphere('SteamB', .025, [1.58, .71, .45], roomMats.warmLight, cook, [.7, 1.2, .7]);
+
+  const meal = makePropGroup('MealProp');
+  propCyl(meal, 'MealPlate', .13, .018, [-.45, .19, .62], [0, 0, 0], roomMats.bed);
+  sphere('MealRice', .075, [-.45, .21, .62], roomMats.food, meal, [1.1, .35, 1]);
+  propBox(meal, 'Fork', [.16, .01, .012], [-.28, .22, .62], [0, 0, .22], roomMats.steel, .003);
+
+  const feed = makePropGroup('FeedProp');
+  propCyl(feed, 'TreatBowl', .1, .035, [-.72, .065, .84], [0, 0, 0], roomMats.steel);
+  sphere('TreatFood', .06, [-.72, .1, .84], roomMats.food, feed, [1, .4, 1]);
+
+  const play = makePropGroup('PlayProp');
+  sphere('PlayBallLarge', .068, [.08, .075, .9], roomMats.toy, play, [1, 1, 1]);
+  propBox(play, 'BallStripe', [.13, .005, .015], [.08, .075, .9], [0, .2, 0], roomMats.bed, .003);
+
+  const media = makePropGroup('MediaProp');
+  propBox(media, 'GameController', [.18, .04, .095], [.02, .27, .58], [0, .08, 0], roomMats.speaker, .022);
+  propCyl(media, 'ControllerStickL', .014, .012, [-.03, .3, .55], [Math.PI / 2, 0, 0], roomMats.rugTrim);
+  propCyl(media, 'ControllerStickR', .014, .012, [.08, .3, .58], [Math.PI / 2, 0, 0], roomMats.rugTrim);
+  sphere('ControllerButtonA', .014, [.1, .3, .54], roomMats.toy, media, [1, .5, 1]);
+  sphere('ControllerButtonB', .011, [.13, .3, .58], roomMats.warmLight, media, [1, .5, 1]);
+  for (let i = 0; i < 6; i++) {
+    propBox(media, 'MediaPixel', [.055, .006, .03], [-.12 + i * .055, 1.08 + (i % 3) * .045, -1.235], [0, 0, .15 * (i - 2)], roomMats.rugTrim, .004);
+  }
+  for (let i = 0; i < 3; i++) {
+    sphere('MediaNote', .018 + i * .004, [.64 + i * .06, .75 + i * .08, -.95], new THREE.MeshBasicMaterial({ color: 0xffe7a3, transparent: true, opacity: .62 }), media, [1, 1, .6]);
+  }
+
+  const music = makePropGroup('MusicProp');
+  propBox(music, 'PocketPlayer', [.18, .036, .11], [-.42, .17, .66], [0, -.25, 0], roomMats.speaker, .02);
+  propBox(music, 'PocketPlayerScreen', [.13, .006, .064], [-.42, .194, .66], [0, -.25, 0], roomMats.mediaGlow, .006);
+  for (let i = 0; i < 5; i++) {
+    sphere('MusicNote', .013 + i * .002, [-.2 + i * .09, .72 + (i % 2) * .08, .62 - i * .035], new THREE.MeshBasicMaterial({ color: i % 2 ? 0xffc8dd : 0x9ee8ff, transparent: true, opacity: .62 }), music, [1, 1, .55]);
+  }
+
+  const browse = makePropGroup('BrowseProp');
+  propBox(browse, 'BrowseFloatingCardA', [.28, .012, .16], [-.92, .83, -.53], [-.18, .25, .08], roomMats.mediaGlow, .012);
+  propBox(browse, 'BrowseFloatingCardB', [.24, .012, .13], [-1.18, .76, -.46], [-.14, -.18, -.05], roomMats.screen, .012);
+  propBox(browse, 'BrowseThumbA', [.06, .014, .045], [-.99, .847, -.56], [-.18, .25, .08], roomMats.rugTrim, .006);
+  propBox(browse, 'BrowseLineA', [.14, .014, .008], [-.89, .849, -.52], [-.18, .25, .08], roomMats.warmLight, .002);
+  propBox(browse, 'BrowseLineB', [.11, .014, .008], [-.9, .819, -.48], [-.18, .25, .08], roomMats.edge, .002);
+
+  const water = makePropGroup('WaterPlantProp');
+  propBox(water, 'WateringCanBody', [.16, .09, .115], [.72, .31, .76], [0, -.35, 0], roomMats.edge, .025);
+  propBox(water, 'WateringCanSpout', [.18, .022, .022], [.86, .33, .72], [0, -.75, .15], roomMats.edge, .008);
+  propCyl(water, 'WaterDrops', .01, .11, [.95, .23, .72], [0, 0, 0], new THREE.MeshBasicMaterial({ color: 0x8bdfff, transparent: true, opacity: .65 }));
+
+  const clean = makePropGroup('CleanProp');
+  propBox(clean, 'BroomHandle', [.018, .68, .018], [.36, .34, .48], [0, 0, -.28], roomMats.woodDark, .004);
+  propBox(clean, 'BroomBrush', [.22, .055, .075], [.2, .06, .56], [0, .1, 0], roomMats.pot, .012);
+
+  const draw = makePropGroup('DrawProp');
+  propBox(draw, 'SketchPad', [.36, .018, .24], [-1.05, .565, -.39], [-.08, 0, 0], bookMats.page, .01);
+  propBox(draw, 'SketchLineA', [.18, .004, .006], [-1.05, .583, -.42], [0, .2, 0], bookMats.pageLine, .002);
+  propBox(draw, 'SketchLineB', [.12, .004, .006], [-1.05, .588, -.35], [0, -.32, 0], bookMats.pageLine, .002);
+
+  const tea = makePropGroup('TeaProp');
+  propCyl(tea, 'TeaCup', .06, .07, [-.42, .2, .58], [0, 0, 0], roomMats.bed);
+  sphere('TeaSteam', .025, [-.42, .29, .58], roomMats.warmLight, tea, [.6, 1.5, .6]);
+
+  const bath = makePropGroup('BathProp');
+  propBox(bath, 'WashBasin', [.3, .075, .2], [.62, .13, .78], [0, 0, 0], roomMats.bed, .035);
+  propCyl(bath, 'WashWater', .105, .01, [.62, .175, .78], [0, 0, 0], roomMats.edge);
+  for (let i = 0; i < 6; i++) sphere('Bubble', .02 + i * .003, [.52 + i * .04, .22 + (i % 2) * .03, .75 + (i % 3) * .025], roomMats.warmLight, bath, [1, 1, 1]);
+
+  const sleep = makePropGroup('SleepProp');
+  propBox(sleep, 'SleepCover', [.66, .048, .5], [1.27, .492, -.34], [0, 0, 0], roomMats.blanketTop, .075);
+  propBox(sleep, 'SleepCoverDropFront', [.62, .12, .03], [1.27, .428, -.08], [0, 0, 0], roomMats.blanketTop, .02);
+  propBox(sleep, 'SleepCoverDropBack', [.62, .105, .03], [1.27, .432, -.6], [0, 0, 0], roomMats.blanketTop, .02);
+  propBox(sleep, 'SleepCoverFold', [.5, .012, .025], [1.27, .52, -.55], [0, 0, 0], roomMats.rugTrim, .006);
+  for (let i = 0; i < 3; i++) {
+    propBox(sleep, 'SleepZ', [.045, .006, .02], [.78 + i * .08, .77 + i * .08, -.34], [0, 0, -.5], roomMats.warmLight, .003);
+  }
+
+  const outfit = makePropGroup('OutfitProp');
+  propBox(outfit, 'OutfitRail', [.42, .018, .018], [-1.58, .72, -.08], [0, 0, 0], roomMats.edge, .006);
+  propBox(outfit, 'OutfitHangerA', [.13, .012, .012], [-1.68, .67, -.08], [0, 0, -.38], roomMats.steel, .004);
+  propBox(outfit, 'OutfitHangerB', [.13, .012, .012], [-1.48, .67, -.08], [0, 0, .38], roomMats.steel, .004);
+  propBox(outfit, 'OutfitTopPreview', [.22, .22, .035], [-1.58, .52, -.06], [0, 0, 0], roomMats.cushion, .03);
+  propBox(outfit, 'OutfitSleeveL', [.08, .16, .028], [-1.73, .5, -.06], [0, 0, .28], roomMats.cushion, .02);
+  propBox(outfit, 'OutfitSleeveR', [.08, .16, .028], [-1.43, .5, -.06], [0, 0, -.28], roomMats.cushion, .02);
+  propBox(outfit, 'OutfitPantsPreviewL', [.08, .22, .03], [-1.62, .29, -.06], [0, 0, .05], roomMats.fabricDark, .018);
+  propBox(outfit, 'OutfitPantsPreviewR', [.08, .22, .03], [-1.53, .29, -.06], [0, 0, -.05], roomMats.fabricDark, .018);
+  for (let i = 0; i < 5; i++) {
+    sphere('OutfitSpark', .018 + i * .002, [-1.36 + i * .07, .48 + (i % 2) * .1, -.04], roomMats.warmLight, outfit, [1, 1, 1]);
+  }
+}
+addLifeProps();
+
+const headphones = new THREE.Group();
+headphones.name = 'ListeningHeadphones';
+headphones.visible = false;
+function addHeadphonePart(mesh, pos, rot = [0, 0, 0], scale = [1, 1, 1]) {
+  mesh.position.set(...pos);
+  mesh.rotation.set(...rot);
+  mesh.scale.set(...scale);
+  mesh.castShadow = true;
+  headphones.add(mesh);
+  return mesh;
+}
+function createHeadphones() {
+  const shell = new THREE.MeshStandardMaterial({ color: 0xfff5f0, roughness: .45, metalness: .04 });
+  const pad = new THREE.MeshStandardMaterial({ color: 0xf7a8c0, roughness: .6, metalness: .02 });
+  const glow = new THREE.MeshBasicMaterial({ color: 0xffc6d8, transparent: true, opacity: .52 });
+  const band = new THREE.Mesh(new THREE.TorusGeometry(.155, .012, 8, 38, Math.PI), shell);
+  addHeadphonePart(band, [0, .06, -.01], [0, 0, Math.PI]);
+  addHeadphonePart(new THREE.Mesh(new RoundedBoxGeometry(.052, .078, .034, 3, .012), shell), [-.15, -.022, .01], [0, 0, .08]);
+  addHeadphonePart(new THREE.Mesh(new RoundedBoxGeometry(.052, .078, .034, 3, .012), shell), [.15, -.022, .01], [0, 0, -.08]);
+  addHeadphonePart(new THREE.Mesh(new RoundedBoxGeometry(.034, .058, .016, 3, .008), pad), [-.142, -.022, .028], [0, 0, .08]);
+  addHeadphonePart(new THREE.Mesh(new RoundedBoxGeometry(.034, .058, .016, 3, .008), pad), [.142, -.022, .028], [0, 0, -.08]);
+  addHeadphonePart(new THREE.Mesh(new THREE.RingGeometry(.026, .031, 24), glow), [-.152, -.022, .032], [0, 0, .08]);
+  addHeadphonePart(new THREE.Mesh(new THREE.RingGeometry(.026, .031, 24), glow), [.152, -.022, .032], [0, 0, -.08]);
+}
+createHeadphones();
+/* Q 版大头模型：耳机按头骨包围盒手工对位（头骨半宽 .09、发型半宽 .14、耳位世界高 ~.34） */
+const HEADPHONE_FIT = { y: .118, z: -.026, sx: 1.0, sy: .82, sz: 1.0 };
+let headphoneParent = null;
+function updateHeadphones(t) {
+  const head = vrm?.humanoid?.getNormalizedBoneNode('head');
+  if (!head) return;
+  if (headphoneParent !== head) {
+    headphoneParent?.remove(headphones);
+    head.add(headphones);
+    headphoneParent = head;
+  }
+  /* 只有真的在听歌时才戴耳机，平时不常驻 */
+  headphones.visible = musicState.playing || currentKey === 'ListenMusic';
+  if (!headphones.visible) return;
+  const hs = diyState.shape.headScale || 1;
+  headphones.position.set(0, HEADPHONE_FIT.y + Math.sin(t * 1.6) * .0015, HEADPHONE_FIT.z);
+  headphones.rotation.set(0, 0, 0);
+  headphones.scale.set(HEADPHONE_FIT.sx * hs, HEADPHONE_FIT.sy * hs, HEADPHONE_FIT.sz * hs);
+  headphones.children.forEach((part, i) => {
+    if (part.material?.isMeshBasicMaterial) part.material.opacity = .38 + Math.sin(t * 2.4 + i) * .14;
+  });
+}
+
+const glowRing = new THREE.Mesh(
+  new THREE.RingGeometry(.72, .745, 90),
+  new THREE.MeshBasicMaterial({ color: 0xf9a8c4, transparent: true, opacity: .35, side: THREE.DoubleSide })
+);
+glowRing.rotation.x = -Math.PI / 2;
+glowRing.position.y = .012;
+scene.add(glowRing);
+const ring2 = new THREE.Mesh(
+  new THREE.RingGeometry(.86, .863, 90),
+  new THREE.MeshBasicMaterial({ color: 0x8fd8c6, transparent: true, opacity: .2, side: THREE.DoubleSide })
+);
+ring2.rotation.x = -Math.PI / 2;
+ring2.position.y = .012;
+scene.add(ring2);
+
+/* ================= 加载 ================= */
+const loaderUI = document.getElementById('loader');
+const loadBar = document.getElementById('load-bar');
+
+const gltfLoader = new GLTFLoader();
+gltfLoader.crossOrigin = 'anonymous';
+gltfLoader.register(p => new VRMLoaderPlugin(p));
+gltfLoader.register(p => new VRMAnimationLoaderPlugin(p));
+
+const MODEL_URL = 'assets/MiniWaffle.vrm';
+const ROOM_ASSET_URL = 'assets/macaron_room.glb?v=20260705-1943';
+let roomAsset = null;
+
+/* 带 PROC 定义的是程序生成动作（量身定制不穿模），其余为 VRMA 文件 */
+const ANIMS = [
+  { key: 'Idle',       label: '站立' },
+  { key: 'Walk',       label: '走路', ui: false },
+  { key: 'Greet',      label: '打招呼' },
+  { key: 'Nod',        label: '点头' },
+  { key: 'Shake',      label: '摇头' },
+  { key: 'Bow',        label: '鞠躬' },
+  { key: 'Sit',        label: '坐下' },
+  { key: 'ReadBook',   label: '看书' },
+  { key: 'DeskStudy',  label: '书桌', ui: false },
+  { key: 'CookMeal',   label: '做饭', ui: false },
+  { key: 'EatMeal',    label: '吃饭', ui: false },
+  { key: 'FeedPet',    label: '喂食', ui: false },
+  { key: 'PlayBall',   label: '玩球', ui: false },
+  { key: 'WatchMedia', label: '影音', ui: false },
+  { key: 'ListenMusic', label: '听歌', ui: false },
+  { key: 'BrowseWeb',  label: '浏览', ui: false },
+  { key: 'WaterPlant', label: '浇花', ui: false },
+  { key: 'CleanRoom',  label: '打扫', ui: false },
+  { key: 'DrawDesk',   label: '画画', ui: false },
+  { key: 'DrinkTea',   label: '喝茶', ui: false },
+  { key: 'BathTime',   label: '洗漱', ui: false },
+  { key: 'OutfitChange', label: '换装', ui: false },
+  { key: 'HappyDance', label: '跳舞', ui: false },
+  { key: 'Sleep',      label: '睡觉' },
+  { key: 'Relax',      label: '伸展' },
+  { key: 'LookAround', label: '张望' },
+  { key: 'Goodbye',    label: '挥手' },
+  { key: 'Clapping',   label: '鼓掌' },
+  { key: 'Thinking',   label: '思考' },
+  { key: 'Jump',       label: '跳跃' },
+  { key: 'Surprised',  label: '惊讶' },
+  { key: 'Angry',      label: '生气' },
+  { key: 'Blush',      label: '害羞' },
+  { key: 'Sad',        label: '失落' },
+  { key: 'Sleepy',     label: '犯困' },
+];
+const IDLE = 'Idle';
+
+let vrm = null;
+let mixer = null;
+let modelFrame = { height: 1, minY: 0, maxY: 1, center: new THREE.Vector3(0, .5, 0) };
+const vrmAnims = {};
+const actions = {};
+let currentAction = null;
+let currentKey = null;
+let avatarHome = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
+let avatarTween = null;
+let walkMove = null;
+let walkDoneCallback = null;
+const walkBounds = { minX: -1.85, maxX: 1.85, minZ: -.92, maxZ: 1.15 };
+const DEFAULT_WALK_OBSTACLES = [
+  { minX: -1.56, maxX: -.54, minZ: -.86, maxZ: -.31 },  // desk
+  { minX: -1.36, maxX: -.74, minZ: -.35, maxZ: .17 },   // chair
+  { minX: .34, maxX: 1.78, minZ: -.76, maxZ: .14 },     // bed
+  { minX: 1.25, maxX: 1.88, minZ: .2, maxZ: .68 },      // kitchen
+  { minX: -.72, maxX: -.14, minZ: .44, maxZ: .82 },      // low table
+  { minX: -2.14, maxX: -1.57, minZ: -.35, maxZ: .06 },   // wardrobe
+];
+const walkObstacles = [...DEFAULT_WALK_OBSTACLES];
+const walkMarker = new THREE.Mesh(
+  new THREE.RingGeometry(.09, .095, 36),
+  new THREE.MeshBasicMaterial({ color: 0xf78fb3, transparent: true, opacity: 0, side: THREE.DoubleSide })
+);
+walkMarker.rotation.x = -Math.PI / 2;
+walkMarker.position.y = .018;
+scene.add(walkMarker);
+const PLACEMENTS = {
+  /* 新房间的书桌椅背比角色还高，坐上去会整个被挡住并穿模；改为坐在地毯上面向镜头 */
+  Sit: {
+    position: [0, .03, .3],
+    rotation: [0, 0, 0],
+    camera: { position: [0, .55, 1.95], target: [0, .22, .28] },
+  },
+  ReadBook: {
+    position: [0, .025, .22],
+    rotation: [0, 0, 0],
+    camera: { position: [0, .6, 2.08], target: [0, .3, .2] },
+  },
+  DeskStudy: {
+    position: [-1.05, .19, -.08],
+    rotation: [0, Math.PI * .72, 0],
+    camera: { position: [.18, .82, .62], target: [-1.04, .43, -.2] },
+  },
+  CookMeal: {
+    position: [1.36, .025, 1.02],
+    rotation: [0, Math.PI * .28, 0],
+    camera: { position: [1.24, .74, 2.2], target: [1.46, .36, .7] },
+  },
+  EatMeal: {
+    position: [-.12, .035, 1.08],
+    rotation: [0, Math.PI * .86, 0],
+    camera: { position: [.85, .72, .02], target: [-.18, .31, .84] },
+  },
+  FeedPet: {
+    position: [-1.05, .025, .52],
+    rotation: [0, Math.PI * .18, 0],
+    camera: { position: [-1.24, 1.12, 1.55], target: [-1.02, .18, .78] },
+  },
+  PlayBall: {
+    position: [.32, .025, .64],
+    rotation: [0, -.25, 0],
+    camera: { position: [.18, .62, 2.2], target: [.25, .28, .62] },
+  },
+  WatchMedia: {
+    position: [.28, .035, .88],
+    rotation: [0, Math.PI * .92, 0],
+    camera: { position: [.48, .68, 2.16], target: [.08, .34, -.18] },
+  },
+  ListenMusic: {
+    position: [.44, .025, .48],
+    rotation: [0, .08, 0],
+    camera: { position: [.28, .76, 2.18], target: [.42, .36, .46] },
+  },
+  BrowseWeb: {
+    position: [-1.05, .19, -.08],
+    rotation: [0, Math.PI * .72, 0],
+    camera: { position: [.18, .82, .62], target: [-1.04, .43, -.2] },
+  },
+  WaterPlant: {
+    position: [.46, .025, 1.02],
+    rotation: [0, .22, 0],
+    camera: { position: [.28, .62, 2.02], target: [.78, .3, .82] },
+  },
+  CleanRoom: {
+    position: [.16, .025, .46],
+    rotation: [0, -.18, 0],
+    camera: { position: [.02, .6, 2.12], target: [.12, .28, .46] },
+  },
+  DrawDesk: {
+    position: [-1.05, .19, -.08],
+    rotation: [0, Math.PI * .72, 0],
+    camera: { position: [.18, .82, .62], target: [-1.04, .43, -.2] },
+  },
+  DrinkTea: {
+    position: [-.12, .035, 1.08],
+    rotation: [0, Math.PI * .86, 0],
+    camera: { position: [.85, .72, .02], target: [-.18, .31, .84] },
+  },
+  BathTime: {
+    position: [.42, .025, 1.08],
+    rotation: [0, -Math.PI / 2, 0],
+    camera: { position: [-.78, .88, 1.82], target: [.52, .32, 1.02] },
+  },
+  OutfitChange: {
+    position: [-1.24, .025, .44],
+    rotation: [0, -Math.PI * .42, 0],
+    camera: { position: [-.6, .68, 1.7], target: [-1.3, .35, .22] },
+  },
+  HappyDance: {
+    position: [0, .025, .26],
+    rotation: [0, 0, 0],
+    camera: { position: [0, .72, 2.35], target: [0, .34, .22] },
+  },
+  Sleep: {
+    position: [1.32, .52, -.34],
+    rotation: [0, 0, -Math.PI / 2],
+    camera: { position: [1.18, 1.0, .75], target: [1.16, .45, -.34] },
+  },
+};
+const ACTION_APPROACH_POINTS = {
+  DeskStudy: [-1.05, 0, .24],
+  ReadBook: [0, 0, .34],
+  Sleep: [.26, 0, -.12],
+  CookMeal: [1.38, 0, 1.04],
+  EatMeal: [-.12, 0, 1.1],
+  FeedPet: [-1.05, 0, .52],
+  PlayBall: [.32, 0, .66],
+  WatchMedia: [.28, 0, .92],
+  ListenMusic: [.44, 0, .52],
+  BrowseWeb: [-1.05, 0, .24],
+  WaterPlant: [.46, 0, 1.06],
+  CleanRoom: [.16, 0, .48],
+  DrawDesk: [-1.05, 0, .24],
+  DrinkTea: [-.12, 0, 1.1],
+  BathTime: [.42, 0, 1.12],
+  OutfitChange: [-1.24, 0, .48],
+  HappyDance: [0, 0, .28],
+};
+const ROOM_ANCHORS = {
+  DeskStudy: { approach: 'Anchor_DeskStudy_Approach', final: 'Anchor_DeskStudy_Final' },
+  ReadBook: { approach: 'Anchor_ReadBook_Approach', final: 'Anchor_ReadBook_Final' },
+  Sleep: { approach: 'Anchor_Sleep_Approach', final: 'Anchor_Sleep_Final' },
+  CookMeal: { approach: 'Anchor_CookMeal_Approach', final: 'Anchor_CookMeal_Final' },
+  EatMeal: { approach: 'Anchor_EatMeal_Approach', final: 'Anchor_EatMeal_Final' },
+  FeedPet: { approach: 'Anchor_FeedPet_Approach', final: 'Anchor_FeedPet_Final' },
+  PlayBall: { approach: 'Anchor_PlayBall_Approach', final: 'Anchor_PlayBall_Final' },
+  WatchMedia: { approach: 'Anchor_WatchMedia_Approach', final: 'Anchor_WatchMedia_Final' },
+  BrowseWeb: { approach: 'Anchor_DeskStudy_Approach', final: 'Anchor_DeskStudy_Final' },
+  WaterPlant: { approach: 'Anchor_WaterPlant_Approach', final: 'Anchor_WaterPlant_Final' },
+  CleanRoom: { approach: 'Anchor_CleanRoom_Approach', final: 'Anchor_CleanRoom_Final' },
+  DrawDesk: { approach: 'Anchor_DrawDesk_Approach', final: 'Anchor_DrawDesk_Final' },
+  DrinkTea: { approach: 'Anchor_DrinkTea_Approach', final: 'Anchor_DrinkTea_Final' },
+  BathTime: { approach: 'Anchor_BathTime_Approach', final: 'Anchor_BathTime_Final' },
+  OutfitChange: { approach: 'Anchor_OutfitChange_Approach', final: 'Anchor_OutfitChange_Final' },
+  HappyDance: { approach: 'Anchor_HappyDance_Approach', final: 'Anchor_HappyDance_Final' },
+};
+
+function anchorPosition(name) {
+  const obj = room.getObjectByName(name);
+  if (!obj) return null;
+  room.updateMatrixWorld(true);
+  const p = new THREE.Vector3().setFromMatrixPosition(obj.matrixWorld);
+  return [p.x, p.y, p.z];
+}
+
+/* 房间锚点按旧人形模型标定；Q 版小模型需要微调（睡觉时头要落在枕头上、身体在毯子内） */
+const PLACEMENT_TUNE = {
+  Sleep: [.18, .04, 0],
+};
+function applyRoomAssetAnchors() {
+  for (const [key, names] of Object.entries(ROOM_ANCHORS)) {
+    const approach = anchorPosition(names.approach);
+    if (approach) ACTION_APPROACH_POINTS[key] = approach;
+    const final = anchorPosition(names.final);
+    if (final && PLACEMENTS[key]) {
+      const tune = PLACEMENT_TUNE[key];
+      PLACEMENTS[key].position = tune
+        ? [final[0] + tune[0], final[1] + tune[1], final[2] + tune[2]]
+        : final;
+    }
+  }
+}
+
+function applyRoomAssetNavigation() {
+  const blockers = [];
+  room.updateMatrixWorld(true);
+  room.traverse(o => {
+    const size = o.userData?.walk_blocker_size;
+    if (!Array.isArray(size) || size.length < 3) return;
+    const p = new THREE.Vector3().setFromMatrixPosition(o.matrixWorld);
+    const sx = Number(size[0]) || 0;
+    const sz = Number(size[2]) || 0;
+    if (sx <= 0 || sz <= 0) return;
+    blockers.push({
+      minX: p.x - sx / 2,
+      maxX: p.x + sx / 2,
+      minZ: p.z - sz / 2,
+      maxZ: p.z + sz / 2,
+    });
+  });
+  walkObstacles.length = 0;
+  walkObstacles.push(...(blockers.length ? blockers : DEFAULT_WALK_OBSTACLES));
+}
+
+async function loadRoomAsset() {
+  try {
+    const gltf = await gltfLoader.loadAsync(ROOM_ASSET_URL);
+    room.clear();
+    roomAsset = gltf.scene;
+    roomAsset.name = 'BlenderMacaronRoomAsset';
+    roomAsset.traverse(o => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.receiveShadow = true;
+      o.frustumCulled = false;
+    });
+    room.add(roomAsset);
+    room.updateMatrixWorld(true);
+    walkSurface = room.getObjectByName('RoomFloor') || walkSurface;
+    applyRoomAssetAnchors();
+    applyRoomAssetNavigation();
+    return true;
+  } catch (err) {
+    console.warn('Room asset failed, using procedural fallback:', err);
+    return false;
+  }
+}
+
+async function loadAnimations() {
+  const files = ANIMS.filter(a => !PROC[a.key]);
+  let done = 0;
+  await Promise.all(files.map(async a => {
+    const gltf = await gltfLoader.loadAsync(`assets/${a.key}.vrma`);
+    vrmAnims[a.key] = gltf.userData.vrmAnimations[0];
+    loadBar.style.width = Math.round(++done / (files.length + 1) * 100) + '%';
+  }));
+}
+
+/* ---- 程序生成动作系统：基础站姿 + 各动作在其上叠加 ---- */
+const ARM_Z = 1.35;
+const FOREARM_Z = .10;
+const HAND_Z = .03;
+const BASE = {
+  leftUpperArm:  [0, 0,  ARM_Z],
+  rightUpperArm: [0, 0, -ARM_Z],
+  leftLowerArm:  [0, 0,  FOREARM_Z],
+  rightLowerArm: [0, 0, -FOREARM_Z],
+  leftHand:      [0, 0,  HAND_Z],
+  rightHand:     [0, 0, -HAND_Z],
+  leftUpperLeg:  [0, 0, 0],
+  rightUpperLeg: [0, 0, 0],
+  leftLowerLeg:  [0, 0, 0],
+  rightLowerLeg: [0, 0, 0],
+  leftFoot:      [0, 0, 0],
+  rightFoot:     [0, 0, 0],
+  spine: [0, 0, 0], chest: [0, 0, 0], neck: [0, 0, 0], head: [0, 0, 0],
+};
+/* pulse: 在 [a,b] 内从 0 平滑到 1 再回 0；ease: 在 [a,b] 内从 0 平滑到 1 */
+const pulse = (t, a, b) => (t < a || t > b) ? 0 : Math.sin((t - a) / (b - a) * Math.PI);
+const ease  = (t, a, b) => t < a ? 0 : t > b ? 1 : (1 - Math.cos((t - a) / (b - a) * Math.PI)) / 2;
+
+const PROC = {
+  Idle: { T: 6, loop: true, fn: t => ({
+    leftUpperArm:  [ .018 * Math.sin(t * Math.PI / 3),      0,  ARM_Z - .012 * Math.sin(t * Math.PI * 2 / 3) ],
+    rightUpperArm: [ .018 * Math.sin(t * Math.PI / 3 + 1),  0, -ARM_Z + .012 * Math.sin(t * Math.PI * 2 / 3) ],
+    leftLowerArm:  [ 0, 0,  FOREARM_Z ],
+    rightLowerArm: [ 0, 0, -FOREARM_Z ],
+    leftHand:      [ 0, 0,  HAND_Z ],
+    rightHand:     [ 0, 0, -HAND_Z ],
+    spine: [ .015 * Math.sin(t * Math.PI * 2 / 3), 0, .006 * Math.sin(t * Math.PI / 3) ],
+    chest: [ .022 * Math.sin(t * Math.PI * 2 / 3), 0, 0 ],
+    neck:  [ -.012 * Math.sin(t * Math.PI * 2 / 3), 0, 0 ],
+    head:  [ .01 * Math.sin(t * Math.PI * 2 / 3 + .8), .02 * Math.sin(t * Math.PI / 3), 0 ],
+  })},
+  Walk: { T: .82, loop: true, fn: t => {
+    const s = Math.sin(t * Math.PI * 2 / .82);
+    const c = Math.cos(t * Math.PI * 2 / .82);
+    return {
+      spine:         [ .025 * Math.abs(s), 0, .025 * s ],
+      chest:         [ .03 * Math.abs(s), 0, -.018 * s ],
+      head:          [ -.02 * Math.abs(s), .02 * s, 0 ],
+      leftUpperArm:  [ -.22 * s, 0,  ARM_Z - .05 ],
+      rightUpperArm: [  .22 * s, 0, -ARM_Z + .05 ],
+      leftLowerArm:  [  .12 * s, 0,  FOREARM_Z ],
+      rightLowerArm: [ -.12 * s, 0, -FOREARM_Z ],
+      leftUpperLeg:  [ -.42 * s, 0, 0 ],
+      rightUpperLeg: [  .42 * s, 0, 0 ],
+      leftLowerLeg:  [  .35 * Math.max(0, s), 0, 0 ],
+      rightLowerLeg: [ -.35 * Math.min(0, s), 0, 0 ],
+      leftFoot:      [ .08 * c, 0, 0 ],
+      rightFoot:     [ -.08 * c, 0, 0 ],
+    };
+  }},
+  Nod: { T: 1.6, fn: t => ({
+    head: [ .28 * pulse(t, .1, .8) + .22 * pulse(t, .75, 1.45), 0, 0 ],
+    neck: [ .08 * pulse(t, .1, 1.45), 0, 0 ],
+  })},
+  Shake: { T: 1.7, fn: t => ({
+    head: [ 0, .33 * Math.sin(t * 7.4) * pulse(t, .05, 1.65), 0 ],
+  })},
+  Bow: { T: 2.4, fn: t => {
+    const bend = ease(t, .1, .8) * (1 - ease(t, 1.5, 2.25));
+    return {
+      spine: [ .72 * bend, 0, 0 ],
+      chest: [ .46 * bend, 0, 0 ],
+      neck:  [ .22 * bend, 0, 0 ],
+      head:  [ .3 * bend, 0, 0 ],
+    };
+  }},
+  /* Q 版大头：手臂举过头会整个藏进脑袋里，挥手要朝侧面伸才看得见 */
+  Greet: { T: 2.6, fn: t => {
+    const raise = ease(t, .05, .5) * (1 - ease(t, 2.0, 2.5));
+    const wave = Math.sin(t * 9.5) * pulse(t, .55, 2.0);
+    return {
+      rightUpperArm: [ -.2 * raise, -.12 * raise, -ARM_Z + 1.15 * raise ],
+      rightLowerArm: [ -.15 * raise, -.1 * raise, -FOREARM_Z - .48 * raise + .3 * wave ],
+      rightHand:     [ 0, 0, -HAND_Z - .18 * raise ],
+      spine: [ 0, 0, -.05 * raise ],
+      head: [ 0, .12 * raise, .1 * raise ],
+    };
+  }},
+  Sit: { T: 4.8, loop: true, fn: t => {
+    const breath = Math.sin(t * Math.PI * 2 / 4.8);
+    return {
+      spine:         [ .08 + .012 * breath, 0, 0 ],
+      chest:         [ .06 + .018 * breath, 0, 0 ],
+      head:          [ -.04 + .01 * breath, 0, 0 ],
+      leftUpperArm:  [ .05, 0,  ARM_Z - .16 ],
+      rightUpperArm: [ .05, 0, -ARM_Z + .16 ],
+      leftLowerArm:  [ -.35, 0,  FOREARM_Z + .15 ],
+      rightLowerArm: [ -.35, 0, -FOREARM_Z - .15 ],
+      leftUpperLeg:  [ -1.16,  .46,  .18 ],
+      rightUpperLeg: [ -1.16, -.46, -.18 ],
+      leftLowerLeg:  [ 1.4,  -.26, -.16 ],
+      rightLowerLeg: [ 1.4,   .26,  .16 ],
+      leftFoot:      [ -.5, .1, -.1 ],
+      rightFoot:     [ -.5,-.1,  .1 ],
+    };
+  }},
+  ReadBook: { T: 5.6, loop: true, fn: t => {
+    const breath = Math.sin(t * Math.PI * 2 / 5.6);
+    const page = Math.sin(t * Math.PI * 2 / 2.8);
+    return {
+      spine:         [ -.15 + .006 * breath, 0, 0 ],
+      chest:         [ -.11 + .005 * breath, 0, 0 ],
+      neck:          [ -.045, 0, 0 ],
+      head:          [ -.13 + .008 * breath, .012 * page, 0 ],
+      leftUpperArm:  [ -.08,  .16,  ARM_Z - .72 ],
+      rightUpperArm: [ -.08, -.16, -ARM_Z + .72 ],
+      leftLowerArm:  [ -.68, .05,  FOREARM_Z + .34 ],
+      rightLowerArm: [ -.68,-.05, -FOREARM_Z - .34 ],
+      leftHand:      [ -.08, .04,  HAND_Z + .14 ],
+      rightHand:     [ -.08,-.04, -HAND_Z - .14 ],
+      leftUpperLeg:  [ -1.18,  .48,  .2 ],
+      rightUpperLeg: [ -1.18, -.48, -.2 ],
+      leftLowerLeg:  [ 1.42,  -.28, -.18 ],
+      rightLowerLeg: [ 1.42,   .28,  .18 ],
+      leftFoot:      [ -.52, .1, -.1 ],
+      rightFoot:     [ -.52,-.1,  .1 ],
+    };
+  }},
+  DeskStudy: { T: 5.2, loop: true, fn: t => {
+    const breath = Math.sin(t * Math.PI * 2 / 5.2);
+    return {
+      spine:         [ .12 + .01 * breath, 0, 0 ],
+      chest:         [ .08 + .01 * breath, 0, 0 ],
+      head:          [ .18 + .015 * breath, .02 * Math.sin(t * 1.7), 0 ],
+      leftUpperArm:  [ .08, .18,  ARM_Z - .58 ],
+      rightUpperArm: [ .08,-.18, -ARM_Z + .58 ],
+      leftLowerArm:  [ -.88, .04,  FOREARM_Z + .3 ],
+      rightLowerArm: [ -.88,-.04, -FOREARM_Z - .3 ],
+      leftUpperLeg:  [ -1.05,  .05,  .04 ],
+      rightUpperLeg: [ -1.05, -.05, -.04 ],
+      leftLowerLeg:  [ 1.2, 0, 0 ],
+      rightLowerLeg: [ 1.2, 0, 0 ],
+    };
+  }},
+  CookMeal: { T: 4.2, loop: true, fn: t => {
+    const stir = Math.sin(t * 5.2);
+    return {
+      spine:         [ .08, 0, .02 * stir ],
+      chest:         [ .06, 0, -.02 * stir ],
+      head:          [ .1, .04 * stir, 0 ],
+      rightUpperArm: [ -.08, -.18, -ARM_Z + .76 ],
+      rightLowerArm: [ -.62 + .12 * stir, -.08, -FOREARM_Z - .22 ],
+      rightHand:     [ -.12, -.05, -HAND_Z - .18 ],
+      leftUpperArm:  [ .02, .1, ARM_Z - .25 ],
+      leftLowerArm:  [ -.22, .02, FOREARM_Z + .12 ],
+    };
+  }},
+  EatMeal: { T: 3.8, loop: true, fn: t => {
+    const lift = (.5 + .5 * Math.sin(t * 3.2));
+    return {
+      spine:         [ .07, 0, 0 ],
+      chest:         [ .05, 0, 0 ],
+      head:          [ .12 - .035 * lift, 0, 0 ],
+      rightUpperArm: [ -.02, -.14, -ARM_Z + .92 ],
+      rightLowerArm: [ -.9 + .24 * lift, -.05, -FOREARM_Z - .34 ],
+      rightHand:     [ -.18, -.04, -HAND_Z - .12 ],
+      leftUpperArm:  [ .04, .1, ARM_Z - .4 ],
+      leftLowerArm:  [ -.48, .03, FOREARM_Z + .16 ],
+      leftUpperLeg:  [ -1.12,  .18,  .1 ],
+      rightUpperLeg: [ -1.12, -.18, -.1 ],
+      leftLowerLeg:  [ 1.32, -.12, -.08 ],
+      rightLowerLeg: [ 1.32,  .12,  .08 ],
+      leftFoot:      [ -.36, .04, -.04 ],
+      rightFoot:     [ -.36,-.04,  .04 ],
+    };
+  }},
+  FeedPet: { T: 3.8, loop: true, fn: t => {
+    const offer = Math.sin(t * 2.8) * .035;
+    return {
+      spine:         [ .18 + offer, 0, 0 ],
+      chest:         [ .1 + offer, 0, 0 ],
+      head:          [ .12, 0, 0 ],
+      rightUpperArm: [ -.22, -.2, -ARM_Z + .88 ],
+      rightLowerArm: [ -.62, -.06, -FOREARM_Z - .18 ],
+      leftUpperArm:  [ -.18, .16, ARM_Z - .6 ],
+      leftLowerArm:  [ -.48, .04, FOREARM_Z + .16 ],
+      leftUpperLeg:  [ -.72, .1, .04 ],
+      rightUpperLeg: [ -.72,-.1,-.04 ],
+    };
+  }},
+  PlayBall: { T: 2.6, loop: true, fn: t => {
+    const bounce = Math.sin(t * Math.PI * 2 / 2.6);
+    return {
+      spine:         [ .08 + .035 * Math.abs(bounce), 0, .08 * bounce ],
+      chest:         [ .05, 0, -.04 * bounce ],
+      head:          [ .08, .12 * bounce, 0 ],
+      leftUpperArm:  [ -.12, .12, ARM_Z - .72 ],
+      rightUpperArm: [ -.12,-.12,-ARM_Z + .72 ],
+      leftLowerArm:  [ -.42, .04, FOREARM_Z + .22 ],
+      rightLowerArm: [ -.42,-.04,-FOREARM_Z - .22 ],
+      leftUpperLeg:  [ -.18 * Math.max(0, bounce), 0, 0 ],
+      rightUpperLeg: [ .18 * Math.min(0, bounce), 0, 0 ],
+    };
+  }},
+  WatchMedia: { T: 5.4, loop: true, fn: t => {
+    const breath = Math.sin(t * Math.PI * 2 / 5.4);
+    const tap = Math.sin(t * 7.2);
+    return {
+      spine:         [ .07 + .008 * breath, 0, 0 ],
+      chest:         [ .045 + .006 * breath, 0, -.018 * tap ],
+      neck:          [ .02, 0, 0 ],
+      head:          [ .055 + .006 * breath, .025 * Math.sin(t * 1.2), 0 ],
+      leftUpperArm:  [ -.02,  .18,  ARM_Z - .7 ],
+      rightUpperArm: [ -.02, -.18, -ARM_Z + .7 ],
+      leftLowerArm:  [ -.7 + .035 * tap, .04,  FOREARM_Z + .28 ],
+      rightLowerArm: [ -.7 - .035 * tap,-.04, -FOREARM_Z - .28 ],
+      leftHand:      [ -.06, .035,  HAND_Z + .14 ],
+      rightHand:     [ -.06,-.035, -HAND_Z - .14 ],
+      leftUpperLeg:  [ -1.12,  .18,  .1 ],
+      rightUpperLeg: [ -1.12, -.18, -.1 ],
+      leftLowerLeg:  [ 1.32, -.12, -.08 ],
+      rightLowerLeg: [ 1.32,  .12,  .08 ],
+      leftFoot:      [ -.36, .04, -.04 ],
+      rightFoot:     [ -.36,-.04,  .04 ],
+    };
+  }},
+  ListenMusic: { T: 4.8, loop: true, fn: t => {
+    const beat = Math.sin(t * Math.PI * 2 / 1.2);
+    const slow = Math.sin(t * Math.PI * 2 / 4.8);
+    return {
+      spine:         [ .035 + .01 * slow, 0, .035 * beat ],
+      chest:         [ .028, 0, -.025 * beat ],
+      neck:          [ .02, 0, 0 ],
+      head:          [ .045 + .018 * Math.abs(beat), .035 * slow, .012 * beat ],
+      leftUpperArm:  [ .035,  .08,  ARM_Z - .22 ],
+      rightUpperArm: [ .035, -.08, -ARM_Z + .22 ],
+      leftLowerArm:  [ -.2, .02,  FOREARM_Z + .08 ],
+      rightLowerArm: [ -.2,-.02, -FOREARM_Z - .08 ],
+      leftHand:      [ -.03, .02,  HAND_Z + .05 ],
+      rightHand:     [ -.03,-.02, -HAND_Z - .05 ],
+    };
+  }},
+  BrowseWeb: { T: 4.6, loop: true, fn: t => {
+    const breath = Math.sin(t * Math.PI * 2 / 4.6);
+    const tap = Math.sin(t * 8.6);
+    return {
+      spine:         [ .12 + .008 * breath, 0, 0 ],
+      chest:         [ .08 + .006 * breath, 0, .012 * tap ],
+      head:          [ .14 + .012 * breath, .026 * Math.sin(t * 1.3), 0 ],
+      leftUpperArm:  [ .07,  .16,  ARM_Z - .55 ],
+      rightUpperArm: [ .07, -.16, -ARM_Z + .55 ],
+      leftLowerArm:  [ -.82 + .025 * tap, .04,  FOREARM_Z + .26 ],
+      rightLowerArm: [ -.82 - .025 * tap,-.04, -FOREARM_Z - .26 ],
+      leftUpperLeg:  [ -1.05,  .05,  .04 ],
+      rightUpperLeg: [ -1.05, -.05, -.04 ],
+      leftLowerLeg:  [ 1.2, 0, 0 ],
+      rightLowerLeg: [ 1.2, 0, 0 ],
+    };
+  }},
+  WaterPlant: { T: 4.4, loop: true, fn: t => {
+    const pour = (.5 + .5 * Math.sin(t * 2.2));
+    return {
+      spine:         [ .12, 0, 0 ],
+      chest:         [ .08, 0, 0 ],
+      head:          [ .1, -.08, 0 ],
+      rightUpperArm: [ -.2, -.24, -ARM_Z + .86 ],
+      rightLowerArm: [ -.74 - .12 * pour, -.08, -FOREARM_Z - .22 ],
+      leftUpperArm:  [ -.04, .12, ARM_Z - .42 ],
+      leftLowerArm:  [ -.28, .02, FOREARM_Z + .12 ],
+    };
+  }},
+  CleanRoom: { T: 3.4, loop: true, fn: t => {
+    const sweep = Math.sin(t * 4.1);
+    return {
+      spine:         [ .12, 0, .12 * sweep ],
+      chest:         [ .08, 0, -.06 * sweep ],
+      head:          [ .1, .06 * sweep, 0 ],
+      leftUpperArm:  [ -.14, .12, ARM_Z - .66 ],
+      rightUpperArm: [ -.14,-.12,-ARM_Z + .66 ],
+      leftLowerArm:  [ -.6, .08 * sweep, FOREARM_Z + .18 ],
+      rightLowerArm: [ -.6,-.08 * sweep,-FOREARM_Z - .18 ],
+    };
+  }},
+  DrawDesk: { T: 4.6, loop: true, fn: t => {
+    const draw = Math.sin(t * 5.6);
+    return {
+      spine:         [ .12, 0, 0 ],
+      chest:         [ .08, 0, 0 ],
+      head:          [ .2, .025 * draw, 0 ],
+      rightUpperArm: [ -.08, -.16, -ARM_Z + .74 ],
+      rightLowerArm: [ -.78, -.06, -FOREARM_Z - .22 + .08 * draw ],
+      leftUpperArm:  [ -.02, .12, ARM_Z - .48 ],
+      leftLowerArm:  [ -.52, .04, FOREARM_Z + .12 ],
+      leftUpperLeg:  [ -1.05, .05, .04 ],
+      rightUpperLeg: [ -1.05,-.05,-.04 ],
+      leftLowerLeg:  [ 1.2, 0, 0 ],
+      rightLowerLeg: [ 1.2, 0, 0 ],
+    };
+  }},
+  DrinkTea: { T: 3.6, loop: true, fn: t => {
+    const sip = (.5 + .5 * Math.sin(t * 2.7));
+    return {
+      spine:         [ .05, 0, 0 ],
+      chest:         [ .04, 0, 0 ],
+      head:          [ .1 - .03 * sip, 0, 0 ],
+      rightUpperArm: [ -.02, -.16, -ARM_Z + .92 ],
+      rightLowerArm: [ -.82 + .18 * sip, -.06, -FOREARM_Z - .34 ],
+      rightHand:     [ -.18, -.04, -HAND_Z - .12 ],
+      leftUpperArm:  [ .03, .1, ARM_Z - .28 ],
+      leftUpperLeg:  [ -1.12,  .18,  .1 ],
+      rightUpperLeg: [ -1.12, -.18, -.1 ],
+      leftLowerLeg:  [ 1.32, -.12, -.08 ],
+      rightLowerLeg: [ 1.32,  .12,  .08 ],
+      leftFoot:      [ -.36, .04, -.04 ],
+      rightFoot:     [ -.36,-.04,  .04 ],
+    };
+  }},
+  BathTime: { T: 4.2, loop: true, fn: t => {
+    const scrub = Math.sin(t * 6);
+    return {
+      spine:         [ .08, 0, .04 * scrub ],
+      chest:         [ .06, 0, -.02 * scrub ],
+      head:          [ .08, .05 * scrub, 0 ],
+      leftUpperArm:  [ -.12, .18, ARM_Z - .8 ],
+      rightUpperArm: [ -.12,-.18,-ARM_Z + .8 ],
+      leftLowerArm:  [ -.9, .04, FOREARM_Z + .24 ],
+      rightLowerArm: [ -.9,-.04,-FOREARM_Z - .24 ],
+    };
+  }},
+  OutfitChange: { T: 4.8, loop: true, fn: t => {
+    const sway = Math.sin(t * Math.PI * 2 / 4.8);
+    const check = Math.sin(t * 3.2);
+    return {
+      spine:         [ .06 + .015 * Math.abs(sway), 0, .04 * sway ],
+      chest:         [ .04, 0, -.025 * sway ],
+      neck:          [ .02, -.05 * sway, 0 ],
+      head:          [ .05, -.09 * sway, .035 * sway ],
+      leftUpperArm:  [ -.04,  .2,  ARM_Z - .64 ],
+      rightUpperArm: [ -.04, -.2, -ARM_Z + .64 ],
+      leftLowerArm:  [ -.58 + .08 * check, .04,  FOREARM_Z + .2 ],
+      rightLowerArm: [ -.58 - .08 * check,-.04, -FOREARM_Z - .2 ],
+      leftHand:      [ -.04, .04,  HAND_Z + .08 ],
+      rightHand:     [ -.04,-.04, -HAND_Z - .08 ],
+      leftUpperLeg:  [ -.08 * Math.max(0, sway), 0, 0 ],
+      rightUpperLeg: [ -.08 * Math.max(0, -sway), 0, 0 ],
+    };
+  }},
+  HappyDance: { T: 2.2, loop: true, fn: t => {
+    const s = Math.sin(t * Math.PI * 2 / 2.2);
+    const hop = Math.abs(s);
+    return {
+      spine:         [ .02 + .04 * hop, 0, .12 * s ],
+      chest:         [ .02, 0, -.08 * s ],
+      head:          [ .03, .14 * s, .06 * s ],
+      leftUpperArm:  [ -.18 * hop, .22, ARM_Z - .92 ],
+      rightUpperArm: [ -.18 * hop,-.22,-ARM_Z + .92 ],
+      leftLowerArm:  [ -.42, .06, FOREARM_Z + .3 ],
+      rightLowerArm: [ -.42,-.06,-FOREARM_Z - .3 ],
+      leftUpperLeg:  [ -.18 * Math.max(0, s), 0, 0 ],
+      rightUpperLeg: [ -.18 * Math.max(0, -s), 0, 0 ],
+    };
+  }},
+  Sleep: { T: 5.2, loop: true, fn: t => {
+    const breath = Math.sin(t * Math.PI * 2 / 5.2);
+    return {
+      spine:         [ .02 + .018 * breath, 0, 0 ],
+      chest:         [ .04 + .026 * breath, 0, 0 ],
+      neck:          [ .05, 0, 0 ],
+      head:          [ .08, 0, -.05 ],
+      leftUpperArm:  [ .18, -.10,  ARM_Z - .24 ],
+      rightUpperArm: [ .18,  .10, -ARM_Z + .24 ],
+      leftLowerArm:  [ -.7, 0,  FOREARM_Z + .18 ],
+      rightLowerArm: [ -.7, 0, -FOREARM_Z - .18 ],
+      leftUpperLeg:  [ -.22, .05, 0 ],
+      rightUpperLeg: [ -.22,-.05, 0 ],
+      leftLowerLeg:  [ .24, 0, 0 ],
+      rightLowerLeg: [ .24, 0, 0 ],
+    };
+  }},
+  /* 鼓掌改成小狗式两侧拍手+雀跃点头，原来的胸前合掌全被卫衣和大头挡住 */
+  Clapping: { T: 2.8, fn: t => {
+    const hold = ease(t, .08, .5) * (1 - ease(t, 2.3, 2.7));
+    const flap = Math.sin(t * 12.5) * pulse(t, .55, 2.25);
+    const bounce = Math.abs(Math.sin(t * 6.25)) * pulse(t, .5, 2.3);
+    return {
+      leftUpperArm:  [ -.12 * hold,  .1 * hold,  ARM_Z - 1.05 * hold - .22 * flap ],
+      rightUpperArm: [ -.12 * hold, -.1 * hold, -ARM_Z + 1.05 * hold + .22 * flap ],
+      leftLowerArm:  [ 0, 0,  FOREARM_Z + .12 * hold ],
+      rightLowerArm: [ 0, 0, -FOREARM_Z - .12 * hold ],
+      leftHand:      [ 0, 0,  HAND_Z + .1 * hold ],
+      rightHand:     [ 0, 0, -HAND_Z - .1 * hold ],
+      spine:         [ .025 * bounce, 0, 0 ],
+      head:          [ .06 * bounce, 0, 0 ],
+    };
+  }},
+  Thinking: { T: 2.7, fn: t => {
+    const hold = ease(t, .1, .7) * (1 - ease(t, 2.05, 2.55));
+    return {
+      rightUpperArm: [ .04 * hold,  .18 * hold, -ARM_Z + .99 * hold ],
+      rightLowerArm: [ 0,          -.06 * hold, -FOREARM_Z - .48 * hold ],
+      rightHand:     [ 0,           0,          -HAND_Z - .08 * hold ],
+      head:          [ .08 * hold, -.08 * hold, 0 ],
+      neck:          [ .04 * hold, -.03 * hold, 0 ],
+    };
+  }},
+  Angry: { T: 2.4, fn: t => {
+    const hold = ease(t, .08, .48) * (1 - ease(t, 1.9, 2.3));
+    return {
+      spine:         [ -.04 * hold, 0, 0 ],
+      chest:         [ -.05 * hold, 0, 0 ],
+      leftUpperArm:  [ .06 * hold, -.06 * hold,  ARM_Z - .18 * hold ],
+      rightUpperArm: [ .06 * hold,  .06 * hold, -ARM_Z + .18 * hold ],
+      leftLowerArm:  [ 0, 0,  FOREARM_Z + .22 * hold ],
+      rightLowerArm: [ 0, 0, -FOREARM_Z - .22 * hold ],
+      head:          [ -.04 * hold, .08 * hold, 0 ],
+    };
+  }},
+  /* VRMA 的跳跃在 Q 版身材上大头前倾会吞掉身体，改为程序生成的下蹲-腾空-落地小跳 */
+  Jump: { T: 1.9, hasHipsMotion: true, fn: t => {
+    const crouch = pulse(t, .1, .62);
+    const air = pulse(t, .58, 1.18);
+    const land = pulse(t, 1.14, 1.55);
+    return {
+      hipsPos:       [ 0, -.05 * crouch + .11 * air - .028 * land, 0 ],
+      spine:         [ .14 * crouch + .08 * land - .05 * air, 0, 0 ],
+      chest:         [ .08 * crouch - .06 * air, 0, 0 ],
+      head:          [ .05 * crouch - .1 * air, 0, 0 ],
+      leftUpperArm:  [ -.1 * air, .08 * air,  ARM_Z - .35 * crouch - 1.05 * air ],
+      rightUpperArm: [ -.1 * air, -.08 * air, -ARM_Z + .35 * crouch + 1.05 * air ],
+      leftLowerArm:  [ 0, 0,  FOREARM_Z + .1 * air ],
+      rightLowerArm: [ 0, 0, -FOREARM_Z - .1 * air ],
+      leftUpperLeg:  [ -.62 * crouch - .3 * air - .2 * land, .04, 0 ],
+      rightUpperLeg: [ -.62 * crouch - .3 * air - .2 * land, -.04, 0 ],
+      leftLowerLeg:  [ .85 * crouch + .55 * air + .3 * land, 0, 0 ],
+      rightLowerLeg: [ .85 * crouch + .55 * air + .3 * land, 0, 0 ],
+      leftFoot:      [ -.2 * crouch + .3 * air, 0, 0 ],
+      rightFoot:     [ -.2 * crouch + .3 * air, 0, 0 ],
+    };
+  }},
+  Sleepy: { T: 3.2, fn: t => {
+    const hold = ease(t, .1, .7) * (1 - ease(t, 2.45, 3.05));
+    const sway = Math.sin(t * 3.2) * hold;
+    return {
+      spine: [ .03 * sway, 0, .025 * sway ],
+      neck:  [ .08 * hold, 0, -.04 * hold ],
+      head:  [ .18 * hold + .03 * sway, 0, -.12 * hold ],
+    };
+  }},
+};
+
+function makeProcClip(v, name, def) {
+  const N = Math.max(9, Math.round(def.T * 20) + 1);
+  const times = new Float32Array(N);
+  for (let i = 0; i < N; i++) times[i] = i / (N - 1) * def.T;
+  const eu = new THREE.Euler();
+  const q = new THREE.Quaternion();
+  const tracks = [];
+  for (const bone of Object.keys(BASE)) {
+    const node = v.humanoid.getNormalizedBoneNode(bone);
+    if (!node) continue;
+    const values = new Float32Array(N * 4);
+    for (let i = 0; i < N; i++) {
+      const pose = def.fn(times[i]);
+      const [x, y, z] = pose[bone] || BASE[bone];
+      q.setFromEuler(eu.set(x, y, z));
+      values.set([q.x, q.y, q.z, q.w], i * 4);
+    }
+    tracks.push(new THREE.QuaternionKeyframeTrack(`${node.name}.quaternion`, times, values));
+  }
+  /* 动作里返回 hipsPos: [x,y,z] 偏移即可获得根部位移（跳跃等需要离地的动作） */
+  const hipsNode = v.humanoid.getNormalizedBoneNode('hips');
+  if (hipsNode && def.hasHipsMotion) {
+    const rest = hipsNode.position;
+    const values = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      const pose = def.fn(times[i]);
+      const [x, y, z] = pose.hipsPos || [0, 0, 0];
+      values.set([rest.x + x, rest.y + y, rest.z + z], i * 3);
+    }
+    tracks.push(new THREE.VectorKeyframeTrack(`${hipsNode.name}.position`, times, values));
+  }
+  return new THREE.AnimationClip(name, def.T, tracks);
+}
+
+function buildActions() {
+  Object.keys(actions).forEach(k => delete actions[k]);
+  mixer = new THREE.AnimationMixer(vrm.scene);
+  for (const a of ANIMS) {
+    const def = PROC[a.key];
+    const clip = def ? makeProcClip(vrm, a.key, def) : createVRMAnimationClip(vrmAnims[a.key], vrm);
+    const act = mixer.clipAction(clip);
+    if (!(def && def.loop)) {
+      act.setLoop(THREE.LoopOnce);
+      act.clampWhenFinished = true;
+    }
+    actions[a.key] = act;
+  }
+  mixer.addEventListener('finished', () => play(IDLE, .5));
+  currentAction = null;
+  currentKey = null;
+}
+
+function play(key, fade = .35) {
+  const next = actions[key];
+  if (!next || next === currentAction) return;
+  const previousKey = currentKey;
+  next.reset();
+  if (currentAction) {
+    currentAction.crossFadeTo(next, fade, false);
+    next.play();
+  } else {
+    next.play();
+  }
+  currentAction = next;
+  currentKey = key;
+  applyActionPlacement(key, previousKey);
+  if (key !== 'Sleep') {
+    vrm?.expressionManager?.setValue('blink', 0);
+    if (previousKey === 'Sleep') setExpression(null);
+  }
+  document.querySelectorAll('#anim-btns .abtn').forEach(b =>
+    b.classList.toggle('active', b.dataset.key === key));
+  document.querySelectorAll('#life-actions .abtn').forEach(b =>
+    b.classList.toggle('active', b.dataset.lifeKey === key));
+  updatePropsVisibility();
+}
+
+async function loadModel(url) {
+  const gltf = await gltfLoader.loadAsync(url, e => {
+    if (e.total) loadBar.style.width = Math.round(e.loaded / e.total * 100) + '%';
+  });
+  const newVRM = gltf.userData.vrm;
+
+  VRMUtils.removeUnnecessaryVertices(newVRM.scene);
+  VRMUtils.combineSkeletons(newVRM.scene);
+  VRMUtils.rotateVRM0(newVRM);
+
+  newVRM.scene.traverse(o => {
+    if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; }
+  });
+  prepareDIYModel(newVRM);
+  retexture(newVRM);
+
+  if (vrm) {
+    scene.remove(vrm.scene);
+    VRMUtils.deepDispose(vrm.scene);
+  }
+  vrm = newVRM;
+  scene.add(vrm.scene);
+  avatarHome = { position: vrm.scene.position.clone(), quaternion: vrm.scene.quaternion.clone() };
+  frameModel();
+
+  buildActions();
+  play(IDLE, 0);
+  applyDIYShape();
+  buildExpressionButtons();
+  loaderUI.classList.add('done');
+  window.app = { vrm, mixer, actions, THREE, scene, room, roomAsset, play, camera, controls, renderer, diyState, walkObstacles, ACTION_APPROACH_POINTS, PLACEMENTS };
+  applyStartupParams();
+}
+
+function frameModel() {
+  vrm.scene.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(vrm.scene);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  modelFrame = {
+    height: Math.max(size.y, .6),
+    minY: box.min.y,
+    maxY: box.max.y,
+    center,
+  };
+
+  const ringScale = THREE.MathUtils.clamp(Math.max(size.x, size.z) * 1.45, .55, 1.15);
+  glowRing.scale.setScalar(ringScale);
+  ring2.scale.setScalar(ringScale);
+  focusFull(false);
+}
+
+function focusFull(animated = true) {
+  const y = modelFrame.minY + modelFrame.height * .5;
+  const z = THREE.MathUtils.clamp(modelFrame.height * 2.9, 2.55, 4.6);
+  const pos = [modelFrame.center.x, y + modelFrame.height * .25, z];
+  const target = [modelFrame.center.x, y - modelFrame.height * .04, modelFrame.center.z - .15];
+  if (animated) tweenCamera(pos, target);
+  else {
+    camera.position.set(...pos);
+    controls.target.set(...target);
+    controls.update();
+  }
+}
+
+function focusFace() {
+  const head = vrm && vrm.humanoid.getNormalizedBoneNode('head');
+  const headY = head ? new THREE.Vector3().setFromMatrixPosition(head.matrixWorld).y : modelFrame.maxY * .82;
+  const z = THREE.MathUtils.clamp(modelFrame.height * 1.04, .95, 1.75);
+  tweenCamera([modelFrame.center.x + .04, headY + modelFrame.height * .02, z], [modelFrame.center.x, headY, modelFrame.center.z]);
+}
+
+function moveAvatar(position, rotation, duration = .85) {
+  if (!vrm) return;
+  const nextQuat = avatarHome.quaternion.clone()
+    .multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...rotation)));
+  avatarTween = {
+    t: 0,
+    duration,
+    p0: vrm.scene.position.clone(),
+    p1: new THREE.Vector3(...position),
+    q0: vrm.scene.quaternion.clone(),
+    q1: nextQuat,
+  };
+}
+
+function applyActionPlacement(key, previousKey) {
+  if (key === 'Walk') return;
+  const placement = PLACEMENTS[key];
+  if (placement) {
+    moveAvatar(placement.position, placement.rotation);
+    tweenCamera(placement.camera.position, placement.camera.target);
+    if (key === 'Sleep') setFirstExpression(['relaxed', 'Fun', 'fun', 'happy', 'Joy', 'joy']);
+    return;
+  }
+  if (PLACEMENTS[previousKey]) {
+    moveAvatar(
+      [avatarHome.position.x, avatarHome.position.y, avatarHome.position.z],
+      [0, 0, 0],
+      .65
+    );
+    focusFull(true);
+  }
+}
+
+function updatePropsVisibility() {
+  readingBook.visible = currentKey === 'ReadBook';
+  const propByKey = {
+    DeskStudy: 'DeskStudyProp',
+    CookMeal: 'CookProp',
+    EatMeal: 'MealProp',
+    FeedPet: 'FeedProp',
+    PlayBall: 'PlayProp',
+    WatchMedia: 'MediaProp',
+    ListenMusic: 'MusicProp',
+    BrowseWeb: 'BrowseProp',
+    WaterPlant: 'WaterPlantProp',
+    CleanRoom: 'CleanProp',
+    DrawDesk: 'DrawProp',
+    DrinkTea: 'TeaProp',
+    BathTime: 'BathProp',
+    OutfitChange: 'OutfitProp',
+    Sleep: 'SleepProp',
+  };
+  const activeProp = propByKey[currentKey];
+  Object.entries(propGroups).forEach(([name, group]) => group.visible = name === activeProp);
+}
+
+const readingBookOffset = new THREE.Vector3();
+const readingBookQuat = new THREE.Quaternion();
+function updateReadingBook(t) {
+  if (!readingBook.visible) return;
+  const bob = Math.sin(t * 1.4) * .003;
+  const rootX = vrm?.scene?.position.x ?? avatarHome.position.x;
+  const rootY = vrm?.scene?.position.y ?? avatarHome.position.y;
+  const rootZ = vrm?.scene?.position.z ?? avatarHome.position.z;
+  const yaw = vrm?.scene?.rotation.y ?? 0;
+  readingBookOffset.set(0, .16 + bob, .24).applyQuaternion(
+    readingBookQuat.setFromEuler(new THREE.Euler(0, yaw, 0))
+  );
+  readingBook.position.set(rootX + readingBookOffset.x, rootY + readingBookOffset.y, rootZ + readingBookOffset.z);
+  readingBook.rotation.set(.72 + Math.sin(t * 1.1) * .004, yaw, 0);
+  const lift = Math.sin(t * 1.5) * .0007;
+  ['BookLeftPage', 'BookRightPage', 'BookCenterLine'].forEach(name => {
+    const part = readingBook.getObjectByName(name);
+    if (part) part.position.y = (name === 'BookCenterLine' ? .018 : .012) + lift;
+  });
+}
+
+function updateLifeProps(t) {
+  const cook = propGroups.CookProp;
+  if (cook?.visible) {
+    cook.getObjectByName('SteamA')?.position.set(1.51, .66 + Math.sin(t * 2.2) * .025, .42);
+    cook.getObjectByName('SteamB')?.position.set(1.58, .72 + Math.sin(t * 2.6 + .8) * .025, .45);
+    cook.getObjectByName('Spatula')?.rotation.set(0, 0, .45 + Math.sin(t * 4.8) * .28);
+  }
+  const play = propGroups.PlayProp;
+  if (play?.visible) {
+    const ball = play.getObjectByName('PlayBallLarge');
+    const stripe = play.getObjectByName('BallStripe');
+    if (ball) {
+      const x = .08 + Math.sin(t * 2.8) * .16;
+      const y = .075 + Math.abs(Math.sin(t * 3.2)) * .055;
+      const z = .9 + Math.cos(t * 2.1) * .04;
+      ball.position.set(x, y, z);
+      ball.rotation.z = t * 3.2;
+      if (stripe) {
+        stripe.position.set(x, y, z);
+        stripe.rotation.set(0, .2 + t * 1.5, 0);
+      }
+    }
+  }
+  const media = propGroups.MediaProp;
+  if (media?.visible) {
+    const controller = media.getObjectByName('GameController');
+    if (controller) {
+      controller.rotation.y = .18 + Math.sin(t * 5.2) * .025;
+      controller.position.y = .27 + Math.sin(t * 2.6) * .004;
+    }
+    media.children.filter(o => o.name === 'MediaPixel').forEach((pixel, i) => {
+      pixel.scale.x = .75 + Math.abs(Math.sin(t * 2.8 + i)) * .55;
+      pixel.position.y = 1.08 + (i % 3) * .045 + Math.sin(t * 1.8 + i) * .006;
+    });
+    media.children.filter(o => o.name === 'MediaNote').forEach((note, i) => {
+      note.position.y = .75 + i * .08 + Math.sin(t * 2.1 + i) * .02;
+      note.material.opacity = .42 + Math.sin(t * 2.4 + i) * .18;
+    });
+  }
+  const music = propGroups.MusicProp;
+  if (music?.visible) {
+    const player = music.getObjectByName('PocketPlayer');
+    const screen = music.getObjectByName('PocketPlayerScreen');
+    if (player) player.rotation.y = -.25 + Math.sin(t * 1.8) * .035;
+    if (screen) screen.material.opacity = .22 + Math.abs(Math.sin(t * 2.2)) * .22;
+    music.children.filter(o => o.name === 'MusicNote').forEach((note, i) => {
+      note.position.y = .72 + (i % 2) * .08 + Math.sin(t * 2.4 + i) * .035;
+      note.position.x = -.2 + i * .09 + Math.sin(t * 1.5 + i) * .012;
+      note.material.opacity = .38 + Math.abs(Math.sin(t * 2.1 + i)) * .34;
+    });
+  }
+  const browse = propGroups.BrowseProp;
+  if (browse?.visible) {
+    browse.children.forEach((card, i) => {
+      card.position.y += Math.sin(t * 1.8 + i) * .0008;
+      if (card.material?.isMeshBasicMaterial) card.material.opacity = .28 + Math.abs(Math.sin(t * 2.1 + i)) * .2;
+    });
+  }
+  const water = propGroups.WaterPlantProp;
+  if (water?.visible) {
+    const drops = water.getObjectByName('WaterDrops');
+    if (drops) {
+      drops.position.y = .23 + Math.sin(t * 9) * .018;
+      drops.material.opacity = .35 + Math.abs(Math.sin(t * 7)) * .35;
+    }
+  }
+  const bath = propGroups.BathProp;
+  if (bath?.visible) {
+    bath.children.filter(o => o.name === 'Bubble').forEach((bubble, i) => {
+      bubble.position.y += Math.sin(t * 2 + i) * .0008;
+      bubble.material.opacity = .45 + Math.sin(t * 1.7 + i) * .18;
+    });
+  }
+  const sleep = propGroups.SleepProp;
+  if (sleep?.visible) {
+    const cover = sleep.getObjectByName('SleepCover');
+    const frontDrop = sleep.getObjectByName('SleepCoverDropFront');
+    const backDrop = sleep.getObjectByName('SleepCoverDropBack');
+    const fold = sleep.getObjectByName('SleepCoverFold');
+    const breath = Math.sin(t * 1.2) * .004;
+    if (cover) cover.position.y = .492 + breath;
+    if (frontDrop) frontDrop.position.y = .428 + breath * .55;
+    if (backDrop) backDrop.position.y = .432 + breath * .45;
+    if (fold) fold.position.y = .52 + Math.sin(t * 1.2 + .3) * .004;
+    sleep.children.filter(o => o.name === 'SleepZ').forEach((z, i) => {
+      z.position.y = .77 + i * .08 + Math.sin(t * 1.6 + i) * .018;
+      z.material.opacity = .45 + Math.sin(t * 1.3 + i) * .18;
+    });
+  }
+  const outfit = propGroups.OutfitProp;
+  if (outfit?.visible) {
+    const top = outfit.getObjectByName('OutfitTopPreview');
+    if (top) top.rotation.y = Math.sin(t * 2.2) * .08;
+    [
+      ['OutfitSleeveL', .5],
+      ['OutfitSleeveR', .5],
+      ['OutfitPantsPreviewL', .29],
+      ['OutfitPantsPreviewR', .29],
+    ].forEach(([name, baseY], i) => {
+      const item = outfit.getObjectByName(name);
+      if (item) item.position.y = baseY + Math.sin(t * 2.4 + i) * .006;
+    });
+    outfit.children.filter(o => o.name === 'OutfitSpark').forEach((spark, i) => {
+      const pulse = .75 + Math.sin(t * 3 + i) * .25;
+      spark.scale.setScalar(pulse);
+      spark.material.opacity = .35 + pulse * .32;
+    });
+  }
+}
+
+function updateAvatarTween(dt) {
+  if (!avatarTween || !vrm) return;
+  avatarTween.t += dt / avatarTween.duration;
+  const k = avatarTween.t >= 1 ? 1 : 1 - Math.pow(1 - avatarTween.t, 3);
+  vrm.scene.position.lerpVectors(avatarTween.p0, avatarTween.p1, k);
+  vrm.scene.quaternion.slerpQuaternions(avatarTween.q0, avatarTween.q1, k);
+  if (avatarTween.t >= 1) {
+    avatarTween = null;
+    vrm.springBoneManager?.reset();  // 快速位移后复位耳朵/呆毛物理，避免甩动残留
+  }
+}
+
+function clampWalkPoint(point) {
+  const p = new THREE.Vector3(
+    THREE.MathUtils.clamp(point.x, walkBounds.minX, walkBounds.maxX),
+    avatarHome.position.y,
+    THREE.MathUtils.clamp(point.z, walkBounds.minZ, walkBounds.maxZ)
+  );
+  const margin = .1;
+  for (let i = 0; i < 3; i++) {
+    let moved = false;
+    for (const r of walkObstacles) {
+      if (p.x >= r.minX && p.x <= r.maxX && p.z >= r.minZ && p.z <= r.maxZ) {
+        const exits = [
+          { axis: 'x', value: r.minX - margin, dist: Math.abs(p.x - r.minX) },
+          { axis: 'x', value: r.maxX + margin, dist: Math.abs(p.x - r.maxX) },
+          { axis: 'z', value: r.minZ - margin, dist: Math.abs(p.z - r.minZ) },
+          { axis: 'z', value: r.maxZ + margin, dist: Math.abs(p.z - r.maxZ) },
+        ].sort((a, b) => a.dist - b.dist);
+        const exit = exits.find(e => e.axis === 'x'
+          ? e.value >= walkBounds.minX && e.value <= walkBounds.maxX
+          : e.value >= walkBounds.minZ && e.value <= walkBounds.maxZ) || exits[0];
+        if (exit.axis === 'x') p.x = THREE.MathUtils.clamp(exit.value, walkBounds.minX, walkBounds.maxX);
+        else p.z = THREE.MathUtils.clamp(exit.value, walkBounds.minZ, walkBounds.maxZ);
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return p;
+}
+
+function yawForTarget(from, to) {
+  return Math.atan2(to.x - from.x, to.z - from.z);
+}
+
+function beginWalkTo(point, onDone = null) {
+  if (!vrm) return;
+  walkDoneCallback = onDone;
+  const target = clampWalkPoint(point);
+  const start = vrm.scene.position.clone();
+  const distance = start.distanceTo(target);
+  if (distance < .05) {
+    const done = walkDoneCallback;
+    walkDoneCallback = null;
+    if (done) done();
+    return;
+  }
+  avatarTween = null;
+  setExpression(null);
+  walkMarker.position.set(target.x, .018, target.z);
+  walkMarker.material.opacity = .7;
+  const yaw = yawForTarget(start, target);
+  const targetQuat = avatarHome.quaternion.clone()
+    .multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)));
+  walkMove = {
+    t: 0,
+    duration: THREE.MathUtils.clamp(distance / .62, .55, 2.9),
+    start,
+    target,
+    q0: vrm.scene.quaternion.clone(),
+    q1: targetQuat,
+  };
+  play('Walk', .18);
+  focusFull(true);
+}
+
+function updateWalkMove(dt) {
+  if (!walkMove || !vrm) return;
+  walkMove.t += dt / walkMove.duration;
+  const k = Math.min(walkMove.t, 1);
+  const eased = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+  vrm.scene.position.lerpVectors(walkMove.start, walkMove.target, eased);
+  vrm.scene.quaternion.slerpQuaternions(walkMove.q0, walkMove.q1, Math.min(k * 2.4, 1));
+  walkMarker.material.opacity = Math.max(0, .7 * (1 - k));
+  if (k >= 1) {
+    walkMove = null;
+    walkMarker.material.opacity = 0;
+    const done = walkDoneCallback;
+    walkDoneCallback = null;
+    if (done) done();
+    else play(IDLE, .22);
+  }
+}
+
+/* ================= 换色：新模型材质适配 ================= */
+const tintableMaterials = new Set();
+const DEFAULT_TINT = null;
+let activeTint = DEFAULT_TINT;
+const originalTextureImages = new WeakMap();
+const originalTextureTransforms = new WeakMap();
+const originalNodeScales = new WeakMap();
+const PART_KEYS = ['hair', 'tops', 'pants', 'extras', 'skin', 'eyes'];
+const partMaterials = Object.fromEntries(PART_KEYS.map(k => [k, new Set()]));
+const diyMeshes = { tops: [], pants: [], extras: [] };
+const DIY_COLOR_DEFAULTS = {
+  hair: '#ffffff',
+  tops: '#eaf8fb',
+  pants: '#777986',
+  extras: '#f8fbff',
+  skin: '#ffe9df',
+  eyes: '#89c8e9',
+};
+const DIY_SHAPE_DEFAULTS = {
+  avatarScale: 1,
+  headScale: 1,
+  bodyScale: 1,
+  bodyWidth: 1,
+  eyeScale: 1,
+};
+const diyState = {
+  colors: Object.fromEntries(PART_KEYS.map(k => [k, null])),
+  shape: { ...DIY_SHAPE_DEFAULTS },
+};
+
+function resetPartCollections() {
+  Object.values(partMaterials).forEach(s => s.clear());
+  Object.keys(diyMeshes).forEach(k => diyMeshes[k] = []);
+}
+
+function rememberNodeScale(o) {
+  if (o && !originalNodeScales.has(o)) originalNodeScales.set(o, o.scale.clone());
+}
+
+function restoreNodeScale(o) {
+  const src = o && originalNodeScales.get(o);
+  if (src) o.scale.copy(src);
+}
+
+function cloneMaterialForDIY(m) {
+  const next = m.clone();
+  next.name = m.name;
+  next.userData.sourceMaterialName = m.name || '';
+  if (m.map) next.map = m.map.clone();
+  return next;
+}
+
+function getDIYPart(mesh, material) {
+  const meshName = (mesh.name || '').toLowerCase();
+  const matName = (material.name || '').toLowerCase();
+  if (matName.includes('eye')) return 'eyes';
+  if (meshName.includes('hair')) return 'hair';
+  if (meshName.includes('top')) return 'tops';
+  if (meshName.includes('bottom')) return 'pants';
+  if (meshName.includes('parts') && matName === 'ware') return 'extras';
+  if (matName === 'base' && /body|head/.test(meshName)) return 'skin';
+  return null;
+}
+
+function prepareDIYModel(v) {
+  resetPartCollections();
+  v.scene.traverse(o => {
+    rememberNodeScale(o);
+    if (!o.isMesh || !o.material) return;
+    const source = Array.isArray(o.material) ? o.material : [o.material];
+    const cloned = source.map(m => cloneMaterialForDIY(m));
+    o.material = Array.isArray(o.material) ? cloned : cloned[0];
+    cloned.forEach(m => {
+      rememberOriginalMatColor(m);
+      rememberOriginalTexture(m);
+      const part = getDIYPart(o, m);
+      if (part) partMaterials[part].add(m);
+    });
+    const meshName = (o.name || '').toLowerCase();
+    if (meshName.includes('top')) diyMeshes.tops.push(o);
+    if (meshName.includes('bottom')) diyMeshes.pants.push(o);
+    if (meshName.includes('parts')) diyMeshes.extras.push(o);
+  });
+}
+
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255];
+}
+
+function isTintableMaterial(mesh, material) {
+  const meshName = (mesh.name || '').toLowerCase();
+  const matName = (material.name || '').toLowerCase();
+  return matName === 'ware' || /tops|bottom|hair|parts|wear|cloth|outfit/.test(meshName + ' ' + matName);
+}
+
+/* 旧模型的贴图重映射工具保留不用；换成授权小狗模型后不再洗贴图像素。 */
+const remappedTex = new WeakSet();
+function remapTexture(srcTex, fn) {
+  const img = srcTex && srcTex.image;
+  if (!img || !img.width || remappedTex.has(srcTex)) return;
+  const c = document.createElement('canvas');
+  c.width = img.width; c.height = img.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  const d = ctx.getImageData(0, 0, c.width, c.height);
+  fn(d.data);
+  ctx.putImageData(d, 0, 0);
+  srcTex.image = c;
+  srcTex.needsUpdate = true;
+  remappedTex.add(srcTex);
+}
+
+/* 深色低饱和像素（黑布料）→白；彩色细节保留；单调映射避免花斑 */
+function whitenPixels(p) {
+  for (let i = 0; i < p.length; i += 4) {
+    const r = p[i] / 255, g = p[i + 1] / 255, b = p[i + 2] / 255;
+    const L = .299 * r + .587 * g + .114 * b;
+    const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+    if (chroma < .15) {
+      const nl = .78 + L * .2;
+      p[i] = p[i + 1] = p[i + 2] = Math.round(nl * 255);
+    }
+  }
+}
+
+/* 逐像素转深灰（保留形状与透明度）：无论灯光如何都呈黑色 */
+const darkenPixels = k => p => {
+  for (let i = 0; i < p.length; i += 4) {
+    const L = (.299 * p[i] + .587 * p[i + 1] + .114 * p[i + 2]) / 255;
+    const g = Math.round(L * k * 255);
+    p[i] = g; p[i + 1] = g; p[i + 2] = Math.min(255, g + 6);
+  }
+};
+
+/* MToon 材质有亮面(color)和暗面(shadeColorFactor)两套颜色，要一起改 */
+function rememberOriginalMatColor(m) {
+  if (m.userData.originalColorState) return;
+  m.userData.originalColorState = {
+    color: m.color && m.color.clone(),
+    shadeColorFactor: m.shadeColorFactor && m.shadeColorFactor.clone(),
+  };
+}
+
+function restoreMatColor(m) {
+  const src = m.userData.originalColorState;
+  if (!src) return;
+  if (m.color && src.color) m.color.copy(src.color);
+  if (m.shadeColorFactor && src.shadeColorFactor) m.shadeColorFactor.copy(src.shadeColorFactor);
+  m.needsUpdate = true;
+}
+
+function setMatColor(m, r, g, b) {
+  if (m.color) m.color.setRGB(r, g, b);
+  if (m.shadeColorFactor) m.shadeColorFactor.setRGB(r * .82, g * .82, b * .88);
+  m.needsUpdate = true;
+}
+
+function rememberOriginalTexture(m) {
+  const tex = m.map;
+  const img = tex && tex.image;
+  if (!tex || !img || !img.width || originalTextureImages.has(tex)) return;
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  c.getContext('2d').drawImage(img, 0, 0);
+  originalTextureImages.set(tex, c);
+  originalTextureTransforms.set(tex, {
+    repeat: tex.repeat.clone(),
+    offset: tex.offset.clone(),
+    center: tex.center.clone(),
+    rotation: tex.rotation,
+  });
+}
+
+function restoreTexture(m) {
+  const tex = m.map;
+  const src = tex && originalTextureImages.get(tex);
+  if (!tex || !src) return;
+  const c = document.createElement('canvas');
+  c.width = src.width;
+  c.height = src.height;
+  c.getContext('2d').drawImage(src, 0, 0);
+  tex.image = c;
+  const transform = originalTextureTransforms.get(tex);
+  if (transform) {
+    tex.repeat.copy(transform.repeat);
+    tex.offset.copy(transform.offset);
+    tex.center.copy(transform.center);
+    tex.rotation = transform.rotation;
+  }
+  tex.needsUpdate = true;
+}
+
+function applyClothBlueTexture(m) {
+  const tex = m.map;
+  const src = tex && originalTextureImages.get(tex);
+  if (!tex || !src || (m.name || '').toLowerCase() !== 'ware') return;
+  const c = document.createElement('canvas');
+  c.width = src.width;
+  c.height = src.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(src, 0, 0);
+  const d = ctx.getImageData(0, 0, c.width, c.height);
+  const p = d.data;
+  for (let y = 0; y < c.height * .56; y++) {
+    for (let x = 0; x < c.width; x++) {
+      const i = (y * c.width + x) * 4;
+      if (p[i + 3] < 12) continue;
+      const max = Math.max(p[i], p[i + 1], p[i + 2]);
+      const min = Math.min(p[i], p[i + 1], p[i + 2]);
+      if (max > 210 && max - min < 26) {
+        p[i] = Math.round(p[i] * .96);
+        p[i + 1] = Math.min(255, Math.round(p[i + 1] * .99 + 2));
+        p[i + 2] = Math.min(255, Math.round(p[i + 2] * 1.035 + 6));
+      }
+    }
+  }
+  ctx.putImageData(d, 0, 0);
+  tex.image = c;
+  tex.needsUpdate = true;
+}
+
+function applyDIYColors() {
+  for (const part of PART_KEYS) {
+    const color = diyState.colors[part];
+    if (!color) {
+      if (part === 'skin' || part === 'eyes') {
+        partMaterials[part].forEach(m => {
+          restoreMatColor(m);
+          restoreTexture(m);
+        });
+      }
+      continue;
+    }
+    const rgb = hexToRgb(color);
+    if (!rgb) continue;
+    partMaterials[part].forEach(m => setMatColor(m, rgb[0], rgb[1], rgb[2]));
+  }
+}
+
+function applyEyeTextureScale() {
+  const scale = diyState.shape.eyeScale;
+  partMaterials.eyes.forEach(m => {
+    const tex = m.map;
+    if (!tex) return;
+    const base = originalTextureTransforms.get(tex);
+    if (!base) return;
+    const inv = 1 / scale;
+    tex.center.set(.5, .5);
+    tex.repeat.set(base.repeat.x * inv, base.repeat.y * inv);
+    tex.offset.set(base.offset.x + (1 - inv) * .5, base.offset.y + (1 - inv) * .5);
+    tex.needsUpdate = true;
+  });
+}
+
+function scaleFromOriginal(o, x, y = x, z = x) {
+  if (!o) return;
+  const src = originalNodeScales.get(o);
+  if (!src) return;
+  o.scale.set(src.x * x, src.y * y, src.z * z);
+}
+
+function applyDIYShape() {
+  if (!vrm) return;
+  const s = diyState.shape;
+  const bodyX = s.bodyScale * s.bodyWidth;
+  const bodyY = s.bodyScale;
+  scaleFromOriginal(vrm.scene, s.avatarScale);
+
+  const hips = vrm.humanoid.getNormalizedBoneNode('hips');
+  const head = vrm.humanoid.getNormalizedBoneNode('head');
+  scaleFromOriginal(hips, bodyX, bodyY, bodyX);
+  scaleFromOriginal(head, s.headScale / Math.max(bodyX, .01), s.headScale / Math.max(bodyY, .01), s.headScale / Math.max(bodyX, .01));
+
+  [...diyMeshes.tops, ...diyMeshes.pants, ...diyMeshes.extras].forEach(o => restoreNodeScale(o));
+  applyEyeTextureScale();
+}
+
+function resetDIYControls() {
+  for (const part of PART_KEYS) diyState.colors[part] = null;
+  Object.assign(diyState.shape, DIY_SHAPE_DEFAULTS);
+  document.querySelectorAll('[data-color-part]').forEach(input => {
+    input.value = DIY_COLOR_DEFAULTS[input.dataset.colorPart] || '#ffffff';
+  });
+  document.querySelectorAll('[data-shape-part]').forEach(input => {
+    input.value = DIY_SHAPE_DEFAULTS[input.dataset.shapePart];
+    const value = input.closest('.diy-range')?.querySelector('em');
+    if (value) value.textContent = Math.round(Number(input.value) * 100);
+  });
+  document.querySelectorAll('.outfit').forEach(x => x.classList.remove('active'));
+  document.querySelector('.outfit[data-tint="original"]')?.classList.add('active');
+  applyOutfitTint(null);
+  applyDIYShape();
+}
+
+function applyOutfitTint(tint) {
+  activeTint = tint;
+  tintableMaterials.forEach(m => {
+    restoreMatColor(m);
+    restoreTexture(m);
+    if (Array.isArray(tint)) setMatColor(m, tint[0], tint[1], tint[2]);
+  });
+  if (tint === 'cloth-blue') {
+    [...partMaterials.tops, ...partMaterials.extras].forEach(m => applyClothBlueTexture(m));
+  }
+  applyDIYColors();
+  applyEyeTextureScale();
+}
+
+function parseOutfitTint(value) {
+  if (value === 'original') return null;
+  if (value === 'cloth-blue') return 'cloth-blue';
+  return value.split(',').map(Number);
+}
+
+function selectOutfitButton(button) {
+  if (!button || !vrm) return null;
+  document.querySelectorAll('.outfit').forEach(x => x.classList.remove('active'));
+  button.classList.add('active');
+  applyOutfitTint(parseOutfitTint(button.dataset.tint));
+  return button.textContent.trim();
+}
+
+function getActiveOutfitLabel() {
+  return document.querySelector('.outfit.active')?.textContent.trim() || '原色';
+}
+
+function cycleWardrobeOutfit() {
+  const choices = [...document.querySelectorAll('.outfit')];
+  if (!choices.length) return '新的';
+  const current = choices.findIndex(x => x.classList.contains('active'));
+  const next = choices[(current + 1 + choices.length) % choices.length];
+  return selectOutfitButton(next) || '新的';
+}
+
+function retexture(v) {
+  tintableMaterials.clear();
+  v.scene.traverse(o => {
+    if (!o.isMesh) return;
+    (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+      if (isTintableMaterial(o, m)) {
+        tintableMaterials.add(m);
+        rememberOriginalMatColor(m);
+        rememberOriginalTexture(m);
+      }
+    });
+  });
+  applyOutfitTint(activeTint);
+}
+
+/* ================= 表情 ================= */
+const EXPR_LABELS = {
+  happy: '开心', angry: '生气', sad: '难过', relaxed: '惬意', surprised: '惊讶',
+  joy: '开心', fun: '愉快', sorrow: '难过',
+  Joy: '开心', Fun: '愉快', Sorrow: '难过', Angry: '生气',
+  aa: '口型·啊', ih: '口型·咦', ou: '口型·呜', ee: '口型·诶', oh: '口型·哦',
+  A: '口型·啊', I: '口型·咦', U: '口型·呜', E: '口型·诶', O: '口型·哦',
+  blinkLeft: '眨左眼', blinkRight: '眨右眼', Blink_L: '眨左眼', Blink_R: '眨右眼',
+};
+const exprTargets = {};
+let exprResetTimer = null;
+
+function buildExpressionButtons() {
+  const row = document.getElementById('expr-row');
+  row.innerHTML = '';
+  Object.keys(exprTargets).forEach(k => delete exprTargets[k]);
+  const em = vrm.expressionManager;
+  if (!em) return;
+  /* 枚举模型自带的全部表情（眨眼由系统自动控制、视线类不作为按钮） */
+  const names = em.expressions.map(e => e.expressionName)
+    .filter(n => n !== 'neutral' && n !== 'blink' && !/^look/.test(n));
+  for (const n of names) {
+    exprTargets[n] = 0;
+    const btn = document.createElement('div');
+    btn.className = 'ebtn';
+    btn.textContent = EXPR_LABELS[n] || EXPR_LABELS[n.toLowerCase()] || n;
+    btn.onclick = () => setExpression(n, btn);
+    row.appendChild(btn);
+  }
+  const reset = document.createElement('div');
+  reset.className = 'ebtn';
+  reset.textContent = '恢复';
+  reset.onclick = () => setExpression(null);
+  row.appendChild(reset);
+}
+
+function setExpression(name, btn) {
+  clearTimeout(exprResetTimer);
+  for (const k in exprTargets) exprTargets[k] = 0;
+  document.querySelectorAll('.ebtn').forEach(b => b.classList.remove('active'));
+  if (name && exprTargets[name] !== undefined) {
+    exprTargets[name] = 1;
+    btn && btn.classList.add('active');
+    exprResetTimer = setTimeout(() => setExpression(null), 4000);
+  }
+}
+
+function setFirstExpression(names) {
+  const n = names.find(x => exprTargets[x] !== undefined);
+  if (n) setExpression(n);
+}
+
+/* ================= 眨眼 ================= */
+let blinkT = 1.5 + Math.random() * 3;
+let blinkPhase = 0;
+function updateBlink(dt) {
+  const em = vrm && vrm.expressionManager;
+  if (!em) return;
+  blinkT -= dt;
+  if (blinkT <= 0) blinkPhase += dt * 14;
+  if (blinkPhase > 0) {
+    const v = Math.sin(Math.min(blinkPhase, Math.PI));
+    em.setValue('blink', Math.max(v, 0));
+    if (blinkPhase >= Math.PI) {
+      blinkPhase = 0;
+      em.setValue('blink', 0);
+      blinkT = 1.5 + Math.random() * 3.5;
+    }
+  }
+}
+
+/* ================= 点击互动 ================= */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let downPos = null;
+let lastPointerClickAt = 0;
+const walkPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const ROOM_HOTSPOTS = [
+  { key: 'ReadBook', names: ['Bookshelf', 'Shelf', 'BookSpineDecor'] },
+  { key: 'DeskStudy', names: ['Desk', 'Chair', 'Laptop', 'Keyboard', 'Mouse'] },
+  { key: 'Sleep', names: ['Bed', 'Mattress', 'Blanket', 'Pillow'] },
+  { key: 'CookMeal', names: ['Kitchen', 'Counter', 'Stove', 'Sink', 'Faucet', 'Pot', 'Fridge'] },
+  { key: 'EatMeal', names: ['LowDiningTable', 'LowTable', 'DiningCushion'] },
+  { key: 'FeedPet', names: ['PetCareZone', 'FoodBowl', 'FoodPile', 'FloorCushion'] },
+  { key: 'PlayBall', names: ['ToyBall'] },
+  { key: 'WatchMedia', names: ['Media', 'Television', 'Radio', 'GameDock', 'Speaker'] },
+  { key: 'WaterPlant', names: ['PlantCorner', 'CarePlant', 'PlantPot', 'PlantLeaf'] },
+  { key: 'BathTime', names: ['BathNook', 'BathroomSink', 'BathroomMirror', 'BathSoap'] },
+  { key: 'OutfitChange', names: ['Wardrobe'] },
+];
+
+function setPointerFromEvent(e) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.set(
+    ((e.clientX - rect.left) / rect.width) * 2 - 1,
+    -((e.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  raycaster.setFromCamera(pointer, camera);
+}
+
+function hotspotKeyForObject(object) {
+  for (let o = object; o; o = o.parent) {
+    const name = o.name || '';
+    for (const spot of ROOM_HOTSPOTS) {
+      if (spot.names.some(part => name.includes(part))) return spot.key;
+    }
+    if (o === room) break;
+  }
+  return null;
+}
+
+function getRoomHotspot() {
+  const roomHits = raycaster.intersectObject(room, true);
+  for (const hit of roomHits) {
+    const key = hotspotKeyForObject(hit.object);
+    if (key) return { key, point: hit.point };
+  }
+  return null;
+}
+
+function runRoomHotspot(key) {
+  if (!LIFE_ACTIONS.some(action => action.key === key)) return false;
+  return runLifeAction(key);
+}
+
+function getWalkPoint(e) {
+  if (walkSurface) {
+    const floorHits = raycaster.intersectObject(walkSurface, false);
+    if (floorHits.length) return floorHits[0].point;
+  }
+  if (e.clientY < innerHeight * .36) return null;
+  const fallback = new THREE.Vector3();
+  return raycaster.ray.intersectPlane(walkPlane, fallback) ? fallback : null;
+}
+
+function handleSceneClick(e, fromPointer = false) {
+  if (!vrm) return;
+  const now = performance.now();
+  if (!fromPointer && now - lastPointerClickAt < 120) return;
+  if (fromPointer) lastPointerClickAt = now;
+  setPointerFromEvent(e);
+  const hits = raycaster.intersectObject(vrm.scene, true);
+  if (hits.length) {
+    const y = hits[0].point.y;
+    const head = vrm.humanoid.getNormalizedBoneNode('head');
+    const headY = new THREE.Vector3().setFromMatrixPosition(head.matrixWorld).y;
+    if (y > headY - .14) {
+      play('Blush', .3);
+      setFirstExpression(['happy', 'joy', 'Joy', 'fun', 'Fun']);
+    } else {
+      play('Surprised', .25);
+      setFirstExpression(['surprised', 'Surprised', 'joy', 'Joy']);
+    }
+    return;
+  }
+  const hotspot = getRoomHotspot();
+  if (hotspot && runRoomHotspot(hotspot.key)) return;
+  const walkPoint = getWalkPoint(e);
+  if (walkPoint) beginWalkTo(walkPoint);
+}
+
+renderer.domElement.addEventListener('pointerdown', e => downPos = [e.clientX, e.clientY]);
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downPos) return;
+  const moved = Math.hypot(e.clientX - downPos[0], e.clientY - downPos[1]);
+  downPos = null;
+  if (moved > 6) return;
+  handleSceneClick(e, true);
+});
+renderer.domElement.addEventListener('click', e => handleSceneClick(e, false));
+
+/* ================= 镜头 ================= */
+let camTween = null;
+function tweenCamera(pos, target) {
+  camTween = { t: 0, p0: camera.position.clone(), p1: new THREE.Vector3(...pos), t0: controls.target.clone(), t1: new THREE.Vector3(...target) };
+}
+document.getElementById('cam-face').onclick = () => {
+  if (vrm) focusFace();
+};
+document.getElementById('cam-full').onclick = () => vrm && focusFull(true);
+
+const UI_MIN_KEY = 'mini-waffle-ui-min';
+const uiToggle = document.getElementById('ui-toggle');
+function setUiMinimized(minimized) {
+  document.body.classList.toggle('ui-min', minimized);
+  if (uiToggle) uiToggle.textContent = minimized ? '展开' : '界面';
+  try { localStorage.setItem(UI_MIN_KEY, minimized ? '1' : '0'); } catch (_) {}
+}
+try { setUiMinimized(localStorage.getItem(UI_MIN_KEY) === '1'); } catch (_) {}
+if (uiToggle) uiToggle.onclick = () => setUiMinimized(!document.body.classList.contains('ui-min'));
+
+let activePanelId = null;
+function setActivePanel(id, forceOpen = false) {
+  activePanelId = !forceOpen && activePanelId === id ? null : id;
+  document.querySelectorAll('[data-panel-id]').forEach(panel => {
+    panel.classList.toggle('hidden-panel', panel.dataset.panelId !== activePanelId);
+  });
+  document.querySelectorAll('[data-open-panel]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.openPanel === activePanelId);
+  });
+  if (activePanelId === 'chat' && vrm) focusFace();
+  if (activePanelId === 'music') setPetListening(true);
+  if (activePanelId === 'social') play('BrowseWeb', .24);
+}
+document.querySelectorAll('[data-open-panel]').forEach(btn => {
+  btn.onclick = () => setActivePanel(btn.dataset.openPanel);
+});
+
+/* ================= 陪伴：音乐、浏览与聊天 ================= */
+const MUSIC_TRACKS = [
+  { title: '月台低语', artist: 'Local Synth', mood: 'LO-FI', bpm: 82, notes: [262, 330, 392, 330, 294, 349, 440, 349] },
+  { title: '云朵收音机', artist: 'Local Synth', mood: 'AMBIENT', bpm: 74, notes: [247, 311, 370, 415, 370, 311, 277, 370] },
+  { title: '薄荷夜航', artist: 'Local Synth', mood: 'SYNTH', bpm: 96, notes: [294, 370, 440, 494, 440, 392, 330, 392] },
+];
+const musicState = {
+  index: 0,
+  playing: false,
+  petListening: true,
+  ctx: null,
+  master: null,
+  timer: null,
+  beat: 0,
+};
+function currentTrack() {
+  return MUSIC_TRACKS[musicState.index % MUSIC_TRACKS.length];
+}
+function renderMusicPanel() {
+  const track = currentTrack();
+  const title = document.getElementById('music-title');
+  const meta = document.getElementById('music-meta');
+  const status = document.getElementById('music-status');
+  const playBtn = document.getElementById('music-play');
+  if (title) title.textContent = track.title;
+  if (meta) meta.textContent = `${track.mood} · ${track.bpm} BPM · ${track.artist}`;
+  if (status) status.textContent = musicState.playing
+    ? '你正在和它同步听这首歌。'
+    : '它正在戴着耳机听歌；点击即可一起听。';
+  if (playBtn) playBtn.textContent = musicState.playing ? '暂停' : '一起听';
+}
+function setPetListening(active) {
+  musicState.petListening = active;
+  renderMusicPanel();
+}
+async function ensureAudioContext() {
+  if (!musicState.ctx) {
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    musicState.ctx = new AudioCtor();
+    musicState.master = musicState.ctx.createGain();
+    musicState.master.gain.value = .075;
+    musicState.master.connect(musicState.ctx.destination);
+  }
+  if (musicState.ctx.state === 'suspended') await musicState.ctx.resume();
+}
+function scheduleTone(freq, start, duration, type = 'sine', gainValue = .055) {
+  const ctx = musicState.ctx;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(gainValue, start + .025);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  osc.connect(gain);
+  gain.connect(musicState.master);
+  osc.start(start);
+  osc.stop(start + duration + .04);
+}
+function scheduleMusicBeat() {
+  if (!musicState.playing || !musicState.ctx) return;
+  const track = currentTrack();
+  const beatDur = 60 / track.bpm;
+  const note = track.notes[musicState.beat % track.notes.length];
+  const now = musicState.ctx.currentTime + .035;
+  scheduleTone(note, now, beatDur * .72, 'triangle', .044);
+  if (musicState.beat % 2 === 0) scheduleTone(note / 2, now, beatDur * .9, 'sine', .026);
+  if (musicState.beat % 4 === 2) scheduleTone(note * 1.5, now + beatDur * .25, beatDur * .45, 'sine', .026);
+  musicState.beat += 1;
+  musicState.timer = setTimeout(scheduleMusicBeat, beatDur * 1000);
+}
+async function startMusic() {
+  await ensureAudioContext();
+  clearTimeout(musicState.timer);
+  musicState.playing = true;
+  musicState.petListening = true;
+  musicState.beat = 0;
+  play('ListenMusic', .24);
+  scheduleMusicBeat();
+  renderMusicPanel();
+  setLifeLog(`它正在听《${currentTrack().title}》，你也加入了同步播放。`);
+}
+function stopMusic() {
+  clearTimeout(musicState.timer);
+  musicState.playing = false;
+  renderMusicPanel();
+  setLifeLog('同步播放已暂停，它还戴着耳机自己听。');
+}
+function nextMusicTrack() {
+  musicState.index = (musicState.index + 1) % MUSIC_TRACKS.length;
+  if (musicState.playing) {
+    clearTimeout(musicState.timer);
+    musicState.beat = 0;
+    scheduleMusicBeat();
+  }
+  renderMusicPanel();
+  setLifeLog(`它切到了《${currentTrack().title}》。`);
+}
+document.getElementById('music-play').onclick = () => musicState.playing ? stopMusic() : startMusic();
+document.getElementById('music-next').onclick = nextMusicTrack;
+document.getElementById('music-action').onclick = () => runLifeAction('ListenMusic');
+renderMusicPanel();
+
+const PLATFORMS = {
+  xhs: { label: '小红书', icon: '小', cls: 'platform-xhs', url: q => `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(q)}` },
+  douyin: { label: '抖音', icon: '抖', cls: 'platform-douyin', url: q => `https://www.douyin.com/search/${encodeURIComponent(q)}` },
+  zhihu: { label: '知乎', icon: '知', cls: 'platform-zhihu', url: q => `https://www.zhihu.com/search?type=content&q=${encodeURIComponent(q)}` },
+};
+const FALLBACK_RECS = {
+  xhs: [
+    ['马卡龙小房间布置灵感', '它觉得这个配色可以参考，尤其是薄荷蓝和奶白。', '马卡龙 房间 布置'],
+    ['桌面宠物穿搭记录', '它看到有人给虚拟宠物做了换装日记。', '桌面宠物 换装'],
+  ],
+  douyin: [
+    ['软乎乎的房间改造片段', '它刷到一个短视频，节奏很轻快。', '马卡龙 房间 改造'],
+    ['桌面小宠物日常', '它觉得这种日常短片可以以后做成互动事件。', '桌面宠物 日常'],
+  ],
+  zhihu: [
+    ['桌面宠物怎么做才有陪伴感', '它在看关于长期互动和养成系统的讨论。', '桌面宠物 养成 系统'],
+    ['VRM 模型能改到什么程度', '它刷到一篇解释模型、贴图和动作绑定关系的回答。', 'VRM 模型 修改 动作'],
+  ],
+};
+const socialState = { platform: 'xhs', current: null, aiOnline: false };
+function fallbackRecommendation(platform = socialState.platform) {
+  const list = FALLBACK_RECS[platform] || FALLBACK_RECS.xhs;
+  const item = list[Math.floor(Math.random() * list.length)];
+  const p = PLATFORMS[platform] || PLATFORMS.xhs;
+  return { platform, title: item[0], summary: item[1], url: p.url(item[2]) };
+}
+function setShareCard(rec) {
+  socialState.current = rec;
+  const p = PLATFORMS[rec.platform] || PLATFORMS.xhs;
+  const icon = document.getElementById('share-icon');
+  const title = document.getElementById('share-title');
+  const meta = document.getElementById('share-meta');
+  if (icon) {
+    icon.textContent = p.icon;
+    icon.className = `platform-icon ${p.cls}`;
+  }
+  if (title) title.textContent = rec.title;
+  if (meta) meta.textContent = `${p.label} · ${rec.summary || '它觉得这个值得一起看'}`;
+}
+async function postCompanion(path, payload) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  updateAiBudget(data.usage);
+  return data;
+}
+function updateAiBudget(usage) {
+  const el = document.getElementById('ai-budget');
+  if (!el) return;
+  if (!usage || !socialState.aiOnline) {
+    el.textContent = socialState.aiOnline ? 'AI 已连接。' : 'AI 未连接时会使用本地推荐。';
+    return;
+  }
+  el.textContent = `AI 已连接 · 今日 ${usage.calls || 0} 次 · 约 ${Number(usage.costCny || 0).toFixed(4)} 元`;
+}
+async function refreshAiStatus() {
+  try {
+    const res = await fetch('/api/companion/status');
+    if (!res.ok) return;
+    const data = await res.json();
+    socialState.aiOnline = !!data.configured;
+    updateAiBudget(data.configured ? data.usage : null);
+  } catch (_) {
+    socialState.aiOnline = false;
+    updateAiBudget(null);
+  }
+}
+async function requestPetRecommendation(options = {}) {
+  const platform = socialState.platform;
+  play('BrowseWeb', .24);
+  let rec = fallbackRecommendation(platform);
+  try {
+    const data = await postCompanion('/api/companion/recommend', {
+      platform,
+      mood: petStats.mood,
+      context: {
+        outfit: getActiveOutfitLabel(),
+        level: petGrowth.level,
+      },
+    });
+    if (data.recommendation?.title) {
+      rec = {
+        platform: data.recommendation.platform || platform,
+        title: data.recommendation.title,
+        summary: data.recommendation.summary || rec.summary,
+        url: data.recommendation.url || rec.url,
+      };
+    }
+  } catch (_) {}
+  setShareCard(rec);
+  if (!options.silent) setLifeLog(`它分享了：${rec.title}`);
+  return rec;
+}
+document.querySelectorAll('[data-platform]').forEach(btn => {
+  btn.onclick = () => {
+    socialState.platform = btn.dataset.platform;
+    document.querySelectorAll('[data-platform]').forEach(x => x.classList.toggle('active', x === btn));
+    setShareCard(fallbackRecommendation(socialState.platform));
+  };
+});
+document.getElementById('share-refresh').onclick = () => requestPetRecommendation();
+document.getElementById('share-open').onclick = () => {
+  const rec = socialState.current || fallbackRecommendation(socialState.platform);
+  setShareCard(rec);
+  play('BrowseWeb', .24);
+  window.open(rec.url, '_blank', 'noopener,noreferrer');
+};
+setShareCard(fallbackRecommendation('xhs'));
+refreshAiStatus();
+setInterval(refreshAiStatus, 60000);
+
+const chatHistory = [];
+function appendChatBubble(role, text) {
+  const log = document.getElementById('chat-log');
+  if (!log) return;
+  const bubble = document.createElement('div');
+  bubble.className = `bubble ${role === 'user' ? 'user' : 'pet'}`;
+  bubble.textContent = text;
+  log.appendChild(bubble);
+  log.scrollTop = log.scrollHeight;
+}
+function fallbackPetReply(message) {
+  if (/歌|音乐|听/.test(message)) return `我现在在听《${currentTrack().title}》。你点“一起听”，我们就同步。`;
+  if (/小红书|抖音|知乎|网页|刷/.test(message)) return `我刚刷到“${(socialState.current || fallbackRecommendation()).title}”，可以打开浏览面板一起看。`;
+  if (/累|睡|休息/.test(message)) return '那我陪你安静一会儿。需要的话，我可以去床边休息。';
+  return '我听到了。现在我会用气泡回复，等本地 DeepSeek key 配好后会更像一个有性格的小伙伴。';
+}
+async function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  const message = (input?.value || '').trim();
+  if (!message) return;
+  input.value = '';
+  appendChatBubble('user', message);
+  chatHistory.push({ role: 'user', content: message });
+  play('Greet', .2);
+  let reply = fallbackPetReply(message);
+  try {
+    const data = await postCompanion('/api/companion/chat', {
+      message,
+      history: chatHistory.slice(-8),
+      state: window.petGame?.getState?.() || {},
+      track: currentTrack().title,
+      recommendation: socialState.current,
+    });
+    if (data.reply) reply = data.reply;
+  } catch (_) {}
+  appendChatBubble('pet', reply);
+  chatHistory.push({ role: 'assistant', content: reply });
+  setFirstExpression(['happy', 'joy', 'Joy', 'fun', 'Fun', 'relaxed']);
+  setLifeLog(reply);
+}
+document.getElementById('chat-send').onclick = sendChatMessage;
+document.getElementById('chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendChatMessage();
+});
+document.getElementById('video-call').onclick = () => {
+  setActivePanel('chat', true);
+  focusFace();
+  play('Greet', .22);
+  const screen = document.getElementById('call-screen');
+  if (screen) screen.textContent = '视频小窗 · 已连线';
+};
+
+/* ================= 养成与日常交互 ================= */
+const petStats = { hunger: 72, energy: 68, mood: 80, clean: 76, study: 38 };
+const petGrowth = { level: 1, xp: 0, affection: 8, coins: 0, actions: 0, taskDate: '', tasks: {} };
+const petInventory = { snack: 1, milk: 0, bath: 0, sketch: 0, toy: 0 };
+const CARE_SAVE_KEY = 'mini-waffle-care-v3';
+let latestLifeLog = '房间已准备好，可以安排日常互动。';
+const LIFE_ACTIONS = [
+  { key: 'DeskStudy', label: '书桌看书', stats: { study: 8, mood: 2, energy: -3 }, log: '它坐到书桌前认真看书。' },
+  { key: 'ReadBook', label: '地上看书', stats: { study: 6, mood: 4, energy: -2 }, log: '它抱着书坐在地垫上安静阅读。' },
+  { key: 'Sleep', label: '上床睡觉', stats: { energy: 16, mood: 4, hunger: -4 }, log: '它钻到床边休息，房间安静下来。' },
+  { key: 'CookMeal', label: '做饭', stats: { hunger: 4, mood: 5, energy: -4 }, log: '它在小厨房里搅动锅子，热气冒了出来。' },
+  { key: 'EatMeal', label: '吃饭', stats: { hunger: 16, mood: 4, clean: -2 }, log: '它吃了一份热乎乎的小餐点。' },
+  { key: 'FeedPet', label: '喂食', stats: { hunger: 12, mood: 8 }, log: '你给它添了食物，它看起来很满足。' },
+  { key: 'PlayBall', label: '玩球', stats: { mood: 13, energy: -6, hunger: -3 }, log: '它追着小球在地毯上玩了一会儿。' },
+  { key: 'WatchMedia', label: '影音放松', stats: { mood: 11, energy: -3, hunger: -2 }, log: '它坐在地毯上看了一会儿屏幕，手柄灯轻轻闪着。' },
+  { key: 'ListenMusic', label: '戴耳机听歌', stats: { mood: 12, energy: 2, hunger: -1 }, log: '它戴上耳机，轻轻跟着节拍点头。' },
+  { key: 'BrowseWeb', label: '刷网页', stats: { mood: 8, study: 2, energy: -3 }, log: '它坐到电脑前浏览网页，看到有意思的内容会分享给你。' },
+  { key: 'WaterPlant', label: '浇花', stats: { mood: 5, clean: 2, energy: -2 }, log: '它给角落里的植物浇了水。' },
+  { key: 'CleanRoom', label: '打扫', stats: { clean: 13, energy: -5, mood: 2 }, log: '它拿起扫帚，把地面清理干净。' },
+  { key: 'DrawDesk', label: '画画', stats: { mood: 9, study: 4, energy: -3 }, log: '它趴在桌前画了一张小画。' },
+  { key: 'DrinkTea', label: '喝茶', stats: { mood: 7, energy: 3, hunger: 2 }, log: '它慢慢喝了杯热茶。' },
+  { key: 'BathTime', label: '洗漱', stats: { clean: 15, mood: 3, energy: -2 }, log: '它在小洗漱盆前洗了洗，泡泡飘起来。' },
+  { key: 'OutfitChange', label: '衣柜换装', stats: { mood: 10, clean: 2, energy: -2 }, log: '它在衣柜前挑了一套新的搭配。' },
+  { key: 'HappyDance', label: '开心跳舞', stats: { mood: 15, energy: -8, hunger: -4 }, log: '它开心地跳起了小舞。' },
+];
+const DAILY_TASKS = [
+  { id: 'study', label: '学习/看书', keys: ['DeskStudy', 'ReadBook'], reward: { xp: 10, coins: 8, affection: 2 } },
+  { id: 'meal', label: '照顾饮食', keys: ['CookMeal', 'EatMeal', 'FeedPet'], reward: { xp: 8, coins: 7, affection: 2 } },
+  { id: 'room', label: '清洁整理', keys: ['BathTime', 'CleanRoom', 'WaterPlant'], reward: { xp: 8, coins: 7, affection: 2 } },
+  { id: 'joy', label: '娱乐放松', keys: ['PlayBall', 'WatchMedia', 'ListenMusic', 'BrowseWeb', 'HappyDance'], reward: { xp: 8, coins: 8, affection: 3 } },
+  { id: 'style', label: '换一套搭配', keys: ['OutfitChange'], reward: { xp: 6, coins: 6, affection: 2 } },
+];
+const ACTION_GROWTH = {
+  DeskStudy: { xp: 8, coins: 3, affection: 1 },
+  ReadBook: { xp: 7, coins: 2, affection: 1 },
+  Sleep: { xp: 6, coins: 2, affection: 1 },
+  CookMeal: { xp: 7, coins: 3, affection: 1 },
+  EatMeal: { xp: 6, coins: 2, affection: 1 },
+  FeedPet: { xp: 7, coins: 3, affection: 2 },
+  PlayBall: { xp: 7, coins: 3, affection: 2 },
+  WatchMedia: { xp: 7, coins: 3, affection: 2 },
+  ListenMusic: { xp: 7, coins: 3, affection: 3 },
+  BrowseWeb: { xp: 7, coins: 3, affection: 2 },
+  WaterPlant: { xp: 6, coins: 2, affection: 1 },
+  CleanRoom: { xp: 7, coins: 3, affection: 1 },
+  DrawDesk: { xp: 8, coins: 3, affection: 1 },
+  DrinkTea: { xp: 5, coins: 2, affection: 1 },
+  BathTime: { xp: 7, coins: 3, affection: 1 },
+  OutfitChange: { xp: 6, coins: 3, affection: 2 },
+  HappyDance: { xp: 8, coins: 4, affection: 2 },
+};
+const SHOP_ITEMS = [
+  {
+    id: 'snack', label: '星糖饼干', cost: 8, action: 'EatMeal',
+    stats: { hunger: 14, mood: 4 }, growth: { xp: 2, affection: 1 },
+    buyWords: ['买饼干', '买零食', '买吃的'], useWords: ['吃饼干', '用饼干', '零食'],
+    useLog: '它吃掉一块星糖饼干，精神看起来甜了一点。'
+  },
+  {
+    id: 'milk', label: '温牛奶', cost: 10, action: 'DrinkTea',
+    stats: { hunger: 8, energy: 6, mood: 3 }, growth: { xp: 2, affection: 1 },
+    buyWords: ['买牛奶', '买饮料'], useWords: ['喝牛奶', '用牛奶', '牛奶'],
+    useLog: '它捧着温牛奶慢慢喝完，状态安稳下来。'
+  },
+  {
+    id: 'bath', label: '泡泡护理', cost: 9, action: 'BathTime',
+    stats: { clean: 16, mood: 3 }, growth: { xp: 2, affection: 1 },
+    buyWords: ['买泡泡', '买护理', '买洗漱'], useWords: ['用泡泡', '护理', '泡泡护理'],
+    useLog: '它用了泡泡护理套装，整洁度明显提高。'
+  },
+  {
+    id: 'sketch', label: '贴纸画本', cost: 12, action: 'DrawDesk',
+    stats: { mood: 8, study: 3 }, growth: { xp: 3, affection: 1 },
+    buyWords: ['买画本', '买贴纸'], useWords: ['用画本', '贴纸', '画本'],
+    useLog: '它翻开贴纸画本，在桌前认真贴了一页。'
+  },
+  {
+    id: 'toy', label: '发光球', cost: 12, action: 'PlayBall',
+    stats: { mood: 12, energy: -3, hunger: -2 }, growth: { xp: 3, affection: 2 },
+    buyWords: ['买球', '买玩具'], useWords: ['玩发光球', '用玩具', '发光球'],
+    useLog: '它抱着发光球玩了一会儿，心情涨得很快。'
+  },
+];
+const clampStat = v => Math.max(0, Math.min(100, Math.round(v)));
+const xpForLevel = level => 28 + level * 14;
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function ensureDailyTasks() {
+  const day = todayKey();
+  if (petGrowth.taskDate !== day || !petGrowth.tasks) {
+    petGrowth.taskDate = day;
+    petGrowth.tasks = {};
+  }
+}
+function addGrowth(delta = {}) {
+  let leveled = 0;
+  petGrowth.xp = Math.max(0, Math.round(petGrowth.xp + (delta.xp || 0)));
+  petGrowth.affection = clampStat(petGrowth.affection + (delta.affection || 0));
+  petGrowth.coins = Math.max(0, Math.round(petGrowth.coins + (delta.coins || 0)));
+  petGrowth.actions = Math.max(0, Math.round(petGrowth.actions || 0));
+  while (petGrowth.xp >= xpForLevel(petGrowth.level)) {
+    petGrowth.xp -= xpForLevel(petGrowth.level);
+    petGrowth.level += 1;
+    petGrowth.affection = clampStat(petGrowth.affection + 3);
+    petGrowth.coins += 5;
+    leveled += 1;
+  }
+  return leveled;
+}
+function completeDailyTasks(key) {
+  ensureDailyTasks();
+  const completed = [];
+  for (const task of DAILY_TASKS) {
+    if (petGrowth.tasks[task.id] || !task.keys.includes(key)) continue;
+    petGrowth.tasks[task.id] = true;
+    addGrowth(task.reward);
+    completed.push(task.label);
+  }
+  return completed;
+}
+function applyActionProgress(key) {
+  ensureDailyTasks();
+  const beforeLevel = petGrowth.level;
+  petGrowth.actions += 1;
+  addGrowth(ACTION_GROWTH[key] || { xp: 5, coins: 2, affection: 1 });
+  const completed = completeDailyTasks(key);
+  renderGrowth();
+  renderDailyTasks();
+  const notes = [];
+  if (completed.length) notes.push(`完成任务：${completed.join('、')}。`);
+  if (petGrowth.level > beforeLevel) notes.push(`等级提升到 Lv.${petGrowth.level}。`);
+  return notes;
+}
+function saveCareState() {
+  try {
+    localStorage.setItem(CARE_SAVE_KEY, JSON.stringify({
+      stats: petStats,
+      growth: petGrowth,
+      inventory: petInventory,
+      log: latestLifeLog,
+      savedAt: Date.now(),
+    }));
+  } catch (_) {}
+}
+function loadCareState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CARE_SAVE_KEY) || 'null');
+    if (!saved || !saved.stats) return;
+    Object.entries(saved.stats).forEach(([key, value]) => {
+      if (petStats[key] !== undefined) petStats[key] = clampStat(value);
+    });
+    if (saved.growth) {
+      petGrowth.level = Math.max(1, Math.round(Number(saved.growth.level) || 1));
+      petGrowth.xp = Math.max(0, Math.round(Number(saved.growth.xp) || 0));
+      petGrowth.affection = clampStat(Number(saved.growth.affection) || 0);
+      petGrowth.coins = Math.max(0, Math.round(Number(saved.growth.coins) || 0));
+      petGrowth.actions = Math.max(0, Math.round(Number(saved.growth.actions) || 0));
+      petGrowth.taskDate = String(saved.growth.taskDate || '');
+      petGrowth.tasks = typeof saved.growth.tasks === 'object' && saved.growth.tasks ? saved.growth.tasks : {};
+    }
+    if (saved.inventory && typeof saved.inventory === 'object') {
+      Object.keys(petInventory).forEach(key => {
+        if (saved.inventory[key] !== undefined) petInventory[key] = Math.max(0, Math.round(Number(saved.inventory[key]) || 0));
+      });
+    }
+    if (saved.log) latestLifeLog = saved.log;
+    const hours = Math.min(12, Math.max(0, (Date.now() - Number(saved.savedAt || Date.now())) / 3600000));
+    if (hours > .08) {
+      petStats.hunger = clampStat(petStats.hunger - hours * 2.5);
+      petStats.energy = clampStat(petStats.energy + hours * 1.6);
+      petStats.mood = clampStat(petStats.mood - hours * 1.2);
+      petStats.clean = clampStat(petStats.clean - hours * 1.1);
+      latestLifeLog = hours > 1
+        ? `你离开了约 ${Math.round(hours)} 小时，它在房间里自己待了一会儿。`
+        : latestLifeLog;
+    }
+    ensureDailyTasks();
+  } catch (_) {}
+}
+const commandRules = [
+  { words: ['睡', '休息', '床'], key: 'Sleep' },
+  { words: ['做饭', '煮饭', '厨房', '锅'], key: 'CookMeal' },
+  { words: ['吃', '饿', '饭'], key: 'EatMeal' },
+  { words: ['喂', '食物', '投喂'], key: 'FeedPet' },
+  { words: ['电视', '电影', '屏幕', '影音', '打游戏', '游戏机'], key: 'WatchMedia' },
+  { words: ['听歌', '音乐', '耳机', '一起听', '歌'], key: 'ListenMusic' },
+  { words: ['网页', '浏览', '刷', '小红书', '抖音', '知乎', '帖子'], key: 'BrowseWeb' },
+  { words: ['看书', '读书', '学习'], key: 'DeskStudy' },
+  { words: ['玩球', '球'], key: 'PlayBall' },
+  { words: ['浇花', '植物', '花'], key: 'WaterPlant' },
+  { words: ['打扫', '清理', '扫地'], key: 'CleanRoom' },
+  { words: ['画', '画画', '涂鸦'], key: 'DrawDesk' },
+  { words: ['喝茶', '喝水', '茶'], key: 'DrinkTea' },
+  { words: ['洗', '洗澡', '洗漱', '干净'], key: 'BathTime' },
+  { words: ['换衣', '衣服', '衣柜', '穿衣', '搭配'], key: 'OutfitChange' },
+  { words: ['跳舞', '开心', '高兴'], key: 'HappyDance' },
+];
+function renderStats() {
+  Object.entries(petStats).forEach(([key, value]) => {
+    const row = document.querySelector(`.stat[data-stat="${key}"]`);
+    if (!row) return;
+    row.querySelector('i').style.width = `${value}%`;
+    row.querySelector('em').textContent = value;
+  });
+}
+function renderGrowth() {
+  const maxXp = xpForLevel(petGrowth.level);
+  const xpBar = document.getElementById('xp-bar');
+  const affectionBar = document.getElementById('affection-bar');
+  const coinBar = document.getElementById('coin-bar');
+  if (xpBar) xpBar.style.width = `${Math.min(100, petGrowth.xp / maxXp * 100)}%`;
+  if (affectionBar) affectionBar.style.width = `${petGrowth.affection}%`;
+  if (coinBar) coinBar.style.width = `${Math.min(100, petGrowth.coins)}%`;
+  const level = document.getElementById('pet-level');
+  const affection = document.getElementById('pet-affection');
+  const coins = document.getElementById('pet-coins');
+  if (level) level.textContent = `Lv.${petGrowth.level}`;
+  if (affection) affection.textContent = petGrowth.affection;
+  if (coins) coins.textContent = petGrowth.coins;
+}
+function renderDailyTasks() {
+  ensureDailyTasks();
+  const wrap = document.getElementById('daily-tasks');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  for (const task of DAILY_TASKS) {
+    const row = document.createElement('div');
+    row.className = `task${petGrowth.tasks[task.id] ? ' done' : ''}`;
+    row.innerHTML = `<i></i><b>${task.label}</b><em>+${task.reward.coins}</em>`;
+    wrap.appendChild(row);
+  }
+}
+function renderInventory() {
+  const wrap = document.getElementById('inventory-list');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  for (const item of SHOP_ITEMS) {
+    const row = document.createElement('div');
+    row.className = 'item';
+    const qty = petInventory[item.id] || 0;
+    row.innerHTML = `
+      <b>${item.label}</b>
+      <em>x${qty}</em>
+      <div class="mini-btn${petGrowth.coins < item.cost ? ' disabled' : ''}" data-buy-item="${item.id}">${item.cost}</div>
+      <div class="mini-btn${qty <= 0 ? ' disabled' : ''}" data-use-item="${item.id}">使用</div>
+    `;
+    wrap.appendChild(row);
+  }
+  wrap.querySelectorAll('[data-buy-item]').forEach(btn => {
+    btn.onclick = () => buyItem(btn.dataset.buyItem);
+  });
+  wrap.querySelectorAll('[data-use-item]').forEach(btn => {
+    btn.onclick = () => useInventoryItem(btn.dataset.useItem);
+  });
+}
+function getShopItem(id) {
+  return SHOP_ITEMS.find(item => item.id === id);
+}
+function buyItem(id) {
+  const item = getShopItem(id);
+  if (!item) return false;
+  if (petGrowth.coins < item.cost) {
+    setLifeLog(`金币不够，${item.label} 需要 ${item.cost} 枚金币。`);
+    return false;
+  }
+  petGrowth.coins -= item.cost;
+  petInventory[item.id] = (petInventory[item.id] || 0) + 1;
+  renderGrowth();
+  renderInventory();
+  saveCareState();
+  setLifeLog(`买到了 ${item.label}，已经放进背包。`);
+  return true;
+}
+function useInventoryItem(id) {
+  const item = getShopItem(id);
+  if (!item) return false;
+  if ((petInventory[item.id] || 0) <= 0) {
+    setLifeLog(`背包里没有 ${item.label}，可以先用金币购买。`);
+    return false;
+  }
+  if (!vrm) {
+    setLifeLog('模型还在加载，稍等一下。');
+    return false;
+  }
+  const beforeLevel = petGrowth.level;
+  petInventory[item.id] -= 1;
+  petGrowth.actions += 1;
+  play(item.action, .28);
+  changeStats(item.stats);
+  addGrowth(item.growth);
+  const completed = completeDailyTasks(item.action);
+  renderGrowth();
+  renderDailyTasks();
+  renderInventory();
+  saveCareState();
+  const notes = [];
+  if (completed.length) notes.push(`完成任务：${completed.join('、')}。`);
+  if (petGrowth.level > beforeLevel) notes.push(`等级提升到 Lv.${petGrowth.level}。`);
+  setLifeLog(notes.length ? `${item.useLog} ${notes.join(' ')}` : item.useLog);
+  return true;
+}
+function handleItemCommand(text) {
+  for (const item of SHOP_ITEMS) {
+    if (item.buyWords.some(w => text.includes(w))) {
+      buyItem(item.id);
+      return true;
+    }
+  }
+  for (const item of SHOP_ITEMS) {
+    if (item.useWords.some(w => text.includes(w))) {
+      useInventoryItem(item.id);
+      return true;
+    }
+  }
+  return false;
+}
+function changeStats(delta) {
+  Object.entries(delta || {}).forEach(([key, amount]) => {
+    if (petStats[key] === undefined) return;
+    petStats[key] = clampStat(petStats[key] + amount);
+  });
+  renderStats();
+  saveCareState();
+}
+function setLifeLog(text) {
+  latestLifeLog = text;
+  const log = document.getElementById('life-log');
+  if (log) log.textContent = text;
+  saveCareState();
+}
+function performLifeAction(action) {
+  play(action.key, .28);
+  if (action.key === 'ListenMusic') setPetListening(true);
+  if (action.key === 'BrowseWeb') requestPetRecommendation({ silent: true });
+  changeStats(action.stats);
+  const progressNotes = applyActionProgress(action.key);
+  const logText = action.key === 'OutfitChange'
+    ? `它在衣柜前换上了${cycleWardrobeOutfit()}搭配。`
+    : action.log;
+  setLifeLog(progressNotes.length ? `${logText} ${progressNotes.join(' ')}` : logText);
+  return true;
+}
+function runLifeAction(key, options = {}) {
+  const action = LIFE_ACTIONS.find(a => a.key === key);
+  if (!action) return false;
+  if (!vrm) {
+    setLifeLog('模型还在加载，稍等一下。');
+    return false;
+  }
+  const approach = ACTION_APPROACH_POINTS[key];
+  if (!options.immediate && approach) {
+    const target = new THREE.Vector3(...approach);
+    setLifeLog(`它正走去${action.label}的位置。`);
+    beginWalkTo(target, () => performLifeAction(action));
+    return true;
+  }
+  return performLifeAction(action);
+}
+function runPetCommand() {
+  const input = document.getElementById('pet-command');
+  const text = (input?.value || '').trim();
+  if (!text) return;
+  if (handleItemCommand(text)) return;
+  const rule = commandRules.find(r => r.words.some(w => text.includes(w)));
+  if (!rule) {
+    setLifeLog('这个指令暂时还不会，但已经预留了以后接 LLM 的入口。');
+    return;
+  }
+  runLifeAction(rule.key);
+}
+function previewLifeAction(key) {
+  const action = LIFE_ACTIONS.find(a => a.key === key);
+  if (action) {
+    play(action.key, .2);
+    setLifeLog(action.log);
+    return true;
+  }
+  if (actions[key]) {
+    play(key, .2);
+    return true;
+  }
+  return false;
+}
+function applyStartupParams() {
+  const params = new URLSearchParams(location.search);
+  const action = params.get('action') || params.get('motion');
+  const command = params.get('cmd');
+  const minUi = params.get('ui') === 'min' || params.get('hideUI') === '1';
+  if (minUi) setUiMinimized(true);
+  if (action) {
+    requestAnimationFrame(() => previewLifeAction(action));
+    return;
+  }
+  if (command) {
+    const input = document.getElementById('pet-command');
+    if (input) input.value = command;
+    requestAnimationFrame(runPetCommand);
+  }
+}
+window.petGame = {
+  runLifeAction,
+  runLifeActionNow(key) {
+    return runLifeAction(key, { immediate: true });
+  },
+  previewLifeAction,
+  runCommand(text) {
+    const input = document.getElementById('pet-command');
+    if (input) input.value = text;
+    runPetCommand();
+  },
+  cycleOutfit: cycleWardrobeOutfit,
+  runHotspot: runRoomHotspot,
+  buyItem,
+  useItem: useInventoryItem,
+  setUiMinimized,
+  setActivePanel,
+  startMusic,
+  stopMusic,
+  nextMusicTrack,
+  requestPetRecommendation,
+  sendChatMessage,
+  getState() {
+    return {
+      currentKey,
+      stats: { ...petStats },
+      growth: { ...petGrowth, tasks: { ...petGrowth.tasks } },
+      inventory: { ...petInventory },
+      shop: SHOP_ITEMS.map(item => ({ id: item.id, label: item.label, cost: item.cost, qty: petInventory[item.id] || 0 })),
+      dailyTasks: DAILY_TASKS.map(task => ({
+        id: task.id,
+        label: task.label,
+        done: !!petGrowth.tasks[task.id],
+      })),
+      log: latestLifeLog,
+      outfit: getActiveOutfitLabel(),
+      music: {
+        track: currentTrack().title,
+        playing: musicState.playing,
+        petListening: musicState.petListening,
+      },
+      browsing: socialState.current,
+      uiMinimized: document.body.classList.contains('ui-min'),
+    };
+  },
+};
+loadCareState();
+renderStats();
+renderGrowth();
+renderDailyTasks();
+renderInventory();
+setLifeLog(latestLifeLog);
+
+/* ================= UI ================= */
+const lifeActionWrap = document.getElementById('life-actions');
+for (const action of LIFE_ACTIONS) {
+  const b = document.createElement('div');
+  b.className = 'abtn';
+  b.dataset.lifeKey = action.key;
+  b.textContent = action.label;
+  b.onclick = () => runLifeAction(action.key);
+  lifeActionWrap.appendChild(b);
+}
+document.getElementById('cmd-run').onclick = runPetCommand;
+document.getElementById('pet-command').addEventListener('keydown', e => {
+  if (e.key === 'Enter') runPetCommand();
+});
+
+const animBtnWrap = document.getElementById('anim-btns');
+for (const a of ANIMS) {
+  if (a.ui === false) continue;
+  const b = document.createElement('div');
+  b.className = 'abtn';
+  b.dataset.key = a.key;
+  b.textContent = a.label;
+  b.onclick = () => play(a.key);
+  animBtnWrap.appendChild(b);
+}
+document.querySelectorAll('.outfit').forEach(b => {
+  b.onclick = () => {
+    if (!vrm || b.classList.contains('active')) return;
+    selectOutfitButton(b);
+  };
+});
+document.querySelectorAll('[data-color-part]').forEach(input => {
+  input.addEventListener('input', () => {
+    diyState.colors[input.dataset.colorPart] = input.value;
+    applyOutfitTint(activeTint);
+  });
+});
+document.querySelectorAll('[data-shape-part]').forEach(input => {
+  const value = input.closest('.diy-range')?.querySelector('em');
+  const sync = () => {
+    diyState.shape[input.dataset.shapePart] = Number(input.value);
+    if (value) value.textContent = Math.round(Number(input.value) * 100);
+    applyDIYShape();
+  };
+  input.addEventListener('input', sync);
+  sync();
+});
+document.getElementById('diy-reset').onclick = () => resetDIYControls();
+
+/* ================= 主循环 ================= */
+const clock = new THREE.Clock();
+function tick() {
+  requestAnimationFrame(tick);
+  const dt = clock.getDelta();
+  const t = clock.elapsedTime;
+
+  if (mixer) mixer.update(dt);
+  if (walkMove) updateWalkMove(dt);
+  else updateAvatarTween(dt);
+
+  if (vrm) {
+    const em = vrm.expressionManager;
+    if (em) {
+      for (const k in exprTargets) {
+        const cur = em.getValue(k) ?? 0;
+        em.setValue(k, cur + (exprTargets[k] - cur) * Math.min(dt * 7, 1));
+      }
+    }
+    if (currentKey === 'Sleep') {
+      em?.setValue('blink', .9 + .06 * Math.sin(t * 1.8));
+    } else {
+      updateBlink(dt);
+    }
+    vrm.update(dt);
+  }
+
+  glowRing.material.opacity = .3 + Math.sin(t * 1.8) * .14;
+  ring2.rotation.z = t * .25;
+  updateReadingBook(t);
+  updateLifeProps(t);
+  updateHeadphones(t);
+
+  if (camTween) {
+    camTween.t += dt / .9;
+    const k = camTween.t >= 1 ? 1 : 1 - Math.pow(1 - camTween.t, 3);
+    camera.position.lerpVectors(camTween.p0, camTween.p1, k);
+    controls.target.lerpVectors(camTween.t0, camTween.t1, k);
+    if (camTween.t >= 1) camTween = null;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ================= 启动 ================= */
+(async () => {
+  try {
+    await Promise.all([
+      loadRoomAsset(),
+      loadAnimations(),
+    ]);
+    await loadModel(MODEL_URL);
+    tick();
+  } catch (err) {
+    document.querySelector('#loader p').textContent = 'ERROR: ' + err.message;
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>
