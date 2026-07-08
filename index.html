@@ -368,7 +368,6 @@
     <div class="stat" data-stat="hunger"><span>饱腹</span><div class="bar"><i></i></div><em>72</em></div>
     <div class="stat" data-stat="energy"><span>精力</span><div class="bar"><i></i></div><em>68</em></div>
     <div class="stat" data-stat="mood"><span>心情</span><div class="bar"><i></i></div><em>80</em></div>
-    <div class="stat" data-stat="clean"><span>整洁</span><div class="bar"><i></i></div><em>76</em></div>
     <div class="stat" data-stat="study"><span>学习</span><div class="bar"><i></i></div><em>38</em></div>
   </div>
   <div class="gap"></div>
@@ -1086,19 +1085,10 @@ const ANIMS = [
   { key: 'Sit',        label: '坐下' },
   { key: 'ReadBook',   label: '看书' },
   { key: 'DeskStudy',  label: '书桌', ui: false },
-  { key: 'CookMeal',   label: '做饭', ui: false },
-  { key: 'EatMeal',    label: '吃饭', ui: false },
-  { key: 'FeedPet',    label: '喂食', ui: false },
   { key: 'PlayBall',   label: '玩球', ui: false },
-  { key: 'WatchMedia', label: '影音', ui: false },
   { key: 'ListenMusic', label: '听歌', ui: false },
   { key: 'BrowseWeb',  label: '浏览', ui: false },
-  { key: 'WaterPlant', label: '浇花', ui: false },
-  { key: 'CleanRoom',  label: '打扫', ui: false },
   { key: 'DrawDesk',   label: '画画', ui: false },
-  { key: 'DrinkTea',   label: '喝茶', ui: false },
-  { key: 'BathTime',   label: '洗漱', ui: false },
-  { key: 'OutfitChange', label: '换装', ui: false },
   { key: 'HappyDance', label: '跳舞', ui: false },
   { key: 'Sleep',      label: '睡觉' },
   { key: 'Relax',      label: '伸展' },
@@ -1986,21 +1976,11 @@ function applyActionPlacement(key, previousKey) {
 
 function updatePropsVisibility() {
   readingBook.visible = currentKey === 'ReadBook';
+  /* 道具坐标是旧房间标定的，只保留验证过不悬浮的几个 */
   const propByKey = {
     DeskStudy: 'DeskStudyProp',
-    CookMeal: 'CookProp',
-    EatMeal: 'MealProp',
-    FeedPet: 'FeedProp',
     PlayBall: 'PlayProp',
-    WatchMedia: 'MediaProp',
-    ListenMusic: 'MusicProp',
-    BrowseWeb: 'BrowseProp',
-    WaterPlant: 'WaterPlantProp',
-    CleanRoom: 'CleanProp',
     DrawDesk: 'DrawProp',
-    DrinkTea: 'TeaProp',
-    BathTime: 'BathProp',
-    OutfitChange: 'OutfitProp',
     Sleep: 'SleepProp',
   };
   const activeProp = propByKey[currentKey];
@@ -2667,14 +2647,7 @@ const ROOM_HOTSPOTS = [
   { key: 'ReadBook', names: ['Bookshelf', 'Shelf', 'BookSpineDecor'] },
   { key: 'DeskStudy', names: ['Desk', 'Chair', 'Laptop', 'Keyboard', 'Mouse'] },
   { key: 'Sleep', names: ['Bed', 'Mattress', 'Blanket', 'Pillow'] },
-  { key: 'CookMeal', names: ['Kitchen', 'Counter', 'Stove', 'Sink', 'Faucet', 'Pot', 'Fridge'] },
-  { key: 'EatMeal', names: ['LowDiningTable', 'LowTable', 'DiningCushion'] },
-  { key: 'FeedPet', names: ['PetCareZone', 'FoodBowl', 'FoodPile', 'FloorCushion'] },
   { key: 'PlayBall', names: ['ToyBall'] },
-  { key: 'WatchMedia', names: ['Media', 'Television', 'Radio', 'GameDock', 'Speaker'] },
-  { key: 'WaterPlant', names: ['PlantCorner', 'CarePlant', 'PlantPot', 'PlantLeaf'] },
-  { key: 'BathTime', names: ['BathNook', 'BathroomSink', 'BathroomMirror', 'BathSoap'] },
-  { key: 'OutfitChange', names: ['Wardrobe'] },
 ];
 
 function setPointerFromEvent(e) {
@@ -3067,72 +3040,47 @@ document.getElementById('video-call').onclick = () => {
 /* ================= 养成与日常交互 ================= */
 const petStats = { hunger: 72, energy: 68, mood: 80, clean: 76, study: 38 };
 const petGrowth = { level: 1, xp: 0, affection: 8, coins: 0, actions: 0, taskDate: '', tasks: {} };
-const petInventory = { snack: 1, milk: 0, bath: 0, sketch: 0, toy: 0 };
+const petInventory = { snack: 1, milk: 0, sketch: 0, toy: 0 };
 const CARE_SAVE_KEY = 'mini-waffle-care-v3';
 let latestLifeLog = '房间已准备好，可以安排日常互动。';
+/* 只保留在 Q 版模型上表现良好的动作；表现怪异的一律砍掉（宁缺毋滥） */
 const LIFE_ACTIONS = [
   { key: 'DeskStudy', label: '书桌看书', stats: { study: 8, mood: 2, energy: -3 }, log: '它坐到书桌前认真看书。' },
   { key: 'ReadBook', label: '地上看书', stats: { study: 6, mood: 4, energy: -2 }, log: '它抱着书坐在地垫上安静阅读。' },
   { key: 'Sleep', label: '上床睡觉', stats: { energy: 16, mood: 4, hunger: -4 }, log: '它钻到床边休息，房间安静下来。' },
-  { key: 'CookMeal', label: '做饭', stats: { hunger: 4, mood: 5, energy: -4 }, log: '它在小厨房里搅动锅子，热气冒了出来。' },
-  { key: 'EatMeal', label: '吃饭', stats: { hunger: 16, mood: 4, clean: -2 }, log: '它吃了一份热乎乎的小餐点。' },
-  { key: 'FeedPet', label: '喂食', stats: { hunger: 12, mood: 8 }, log: '你给它添了食物，它看起来很满足。' },
   { key: 'PlayBall', label: '玩球', stats: { mood: 13, energy: -6, hunger: -3 }, log: '它追着小球在地毯上玩了一会儿。' },
-  { key: 'WatchMedia', label: '影音放松', stats: { mood: 11, energy: -3, hunger: -2 }, log: '它坐在地毯上看了一会儿屏幕，手柄灯轻轻闪着。' },
   { key: 'ListenMusic', label: '戴耳机听歌', stats: { mood: 12, energy: 2, hunger: -1 }, log: '它戴上耳机，轻轻跟着节拍点头。' },
   { key: 'BrowseWeb', label: '刷网页', stats: { mood: 8, study: 2, energy: -3 }, log: '它坐到电脑前浏览网页，看到有意思的内容会分享给你。' },
-  { key: 'WaterPlant', label: '浇花', stats: { mood: 5, clean: 2, energy: -2 }, log: '它给角落里的植物浇了水。' },
-  { key: 'CleanRoom', label: '打扫', stats: { clean: 13, energy: -5, mood: 2 }, log: '它拿起扫帚，把地面清理干净。' },
   { key: 'DrawDesk', label: '画画', stats: { mood: 9, study: 4, energy: -3 }, log: '它趴在桌前画了一张小画。' },
-  { key: 'DrinkTea', label: '喝茶', stats: { mood: 7, energy: 3, hunger: 2 }, log: '它慢慢喝了杯热茶。' },
-  { key: 'BathTime', label: '洗漱', stats: { clean: 15, mood: 3, energy: -2 }, log: '它在小洗漱盆前洗了洗，泡泡飘起来。' },
-  { key: 'OutfitChange', label: '衣柜换装', stats: { mood: 10, clean: 2, energy: -2 }, log: '它在衣柜前挑了一套新的搭配。' },
   { key: 'HappyDance', label: '开心跳舞', stats: { mood: 15, energy: -8, hunger: -4 }, log: '它开心地跳起了小舞。' },
 ];
 const DAILY_TASKS = [
-  { id: 'study', label: '学习/看书', keys: ['DeskStudy', 'ReadBook'], reward: { xp: 10, coins: 8, affection: 2 } },
-  { id: 'meal', label: '照顾饮食', keys: ['CookMeal', 'EatMeal', 'FeedPet'], reward: { xp: 8, coins: 7, affection: 2 } },
-  { id: 'room', label: '清洁整理', keys: ['BathTime', 'CleanRoom', 'WaterPlant'], reward: { xp: 8, coins: 7, affection: 2 } },
-  { id: 'joy', label: '娱乐放松', keys: ['PlayBall', 'WatchMedia', 'ListenMusic', 'BrowseWeb', 'HappyDance'], reward: { xp: 8, coins: 8, affection: 3 } },
-  { id: 'style', label: '换一套搭配', keys: ['OutfitChange'], reward: { xp: 6, coins: 6, affection: 2 } },
+  { id: 'study', label: '学习/看书', keys: ['DeskStudy', 'ReadBook', 'DrawDesk'], reward: { xp: 10, coins: 8, affection: 2 } },
+  { id: 'rest', label: '好好休息', keys: ['Sleep'], reward: { xp: 8, coins: 7, affection: 2 } },
+  { id: 'joy', label: '娱乐放松', keys: ['PlayBall', 'ListenMusic', 'BrowseWeb', 'HappyDance'], reward: { xp: 8, coins: 8, affection: 3 } },
 ];
 const ACTION_GROWTH = {
   DeskStudy: { xp: 8, coins: 3, affection: 1 },
   ReadBook: { xp: 7, coins: 2, affection: 1 },
   Sleep: { xp: 6, coins: 2, affection: 1 },
-  CookMeal: { xp: 7, coins: 3, affection: 1 },
-  EatMeal: { xp: 6, coins: 2, affection: 1 },
-  FeedPet: { xp: 7, coins: 3, affection: 2 },
   PlayBall: { xp: 7, coins: 3, affection: 2 },
-  WatchMedia: { xp: 7, coins: 3, affection: 2 },
   ListenMusic: { xp: 7, coins: 3, affection: 3 },
   BrowseWeb: { xp: 7, coins: 3, affection: 2 },
-  WaterPlant: { xp: 6, coins: 2, affection: 1 },
-  CleanRoom: { xp: 7, coins: 3, affection: 1 },
   DrawDesk: { xp: 8, coins: 3, affection: 1 },
-  DrinkTea: { xp: 5, coins: 2, affection: 1 },
-  BathTime: { xp: 7, coins: 3, affection: 1 },
-  OutfitChange: { xp: 6, coins: 3, affection: 2 },
   HappyDance: { xp: 8, coins: 4, affection: 2 },
 };
 const SHOP_ITEMS = [
   {
-    id: 'snack', label: '星糖饼干', cost: 8, action: 'EatMeal',
+    id: 'snack', label: '星糖饼干', cost: 8, action: 'HappyDance',
     stats: { hunger: 14, mood: 4 }, growth: { xp: 2, affection: 1 },
     buyWords: ['买饼干', '买零食', '买吃的'], useWords: ['吃饼干', '用饼干', '零食'],
-    useLog: '它吃掉一块星糖饼干，精神看起来甜了一点。'
+    useLog: '它吃掉一块星糖饼干，开心得跳了起来。'
   },
   {
-    id: 'milk', label: '温牛奶', cost: 10, action: 'DrinkTea',
+    id: 'milk', label: '温牛奶', cost: 10, action: 'Relax',
     stats: { hunger: 8, energy: 6, mood: 3 }, growth: { xp: 2, affection: 1 },
     buyWords: ['买牛奶', '买饮料'], useWords: ['喝牛奶', '用牛奶', '牛奶'],
-    useLog: '它捧着温牛奶慢慢喝完，状态安稳下来。'
-  },
-  {
-    id: 'bath', label: '泡泡护理', cost: 9, action: 'BathTime',
-    stats: { clean: 16, mood: 3 }, growth: { xp: 2, affection: 1 },
-    buyWords: ['买泡泡', '买护理', '买洗漱'], useWords: ['用泡泡', '护理', '泡泡护理'],
-    useLog: '它用了泡泡护理套装，整洁度明显提高。'
+    useLog: '它捧着温牛奶慢慢喝完，舒服地伸了个懒腰。'
   },
   {
     id: 'sketch', label: '贴纸画本', cost: 12, action: 'DrawDesk',
@@ -3247,20 +3195,11 @@ function loadCareState() {
 }
 const commandRules = [
   { words: ['睡', '休息', '床'], key: 'Sleep' },
-  { words: ['做饭', '煮饭', '厨房', '锅'], key: 'CookMeal' },
-  { words: ['吃', '饿', '饭'], key: 'EatMeal' },
-  { words: ['喂', '食物', '投喂'], key: 'FeedPet' },
-  { words: ['电视', '电影', '屏幕', '影音', '打游戏', '游戏机'], key: 'WatchMedia' },
   { words: ['听歌', '音乐', '耳机', '一起听', '歌'], key: 'ListenMusic' },
   { words: ['网页', '浏览', '刷', '小红书', '抖音', '知乎', '帖子'], key: 'BrowseWeb' },
   { words: ['看书', '读书', '学习'], key: 'DeskStudy' },
-  { words: ['玩球', '球'], key: 'PlayBall' },
-  { words: ['浇花', '植物', '花'], key: 'WaterPlant' },
-  { words: ['打扫', '清理', '扫地'], key: 'CleanRoom' },
+  { words: ['玩球', '球', '玩'], key: 'PlayBall' },
   { words: ['画', '画画', '涂鸦'], key: 'DrawDesk' },
-  { words: ['喝茶', '喝水', '茶'], key: 'DrinkTea' },
-  { words: ['洗', '洗澡', '洗漱', '干净'], key: 'BathTime' },
-  { words: ['换衣', '衣服', '衣柜', '穿衣', '搭配'], key: 'OutfitChange' },
   { words: ['跳舞', '开心', '高兴'], key: 'HappyDance' },
 ];
 function renderStats() {
